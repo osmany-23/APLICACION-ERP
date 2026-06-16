@@ -3,8 +3,10 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "build": "vite build",
-        "dev": "vite"
+        "build": "npm --prefix ../frontend run build",
+        "dev": "npm --prefix .. run dev",
+        "build:laravel-assets": "vite build",
+        "dev:laravel-assets": "vite"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",
