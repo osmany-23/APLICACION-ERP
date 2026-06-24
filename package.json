@@ -1,0 +1,10 @@
+{
+  "name": "sistema-erp",
+  "private": true,
+  "scripts": {
+    "dev": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev.ps1",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "cd backend && php artisan serve --host=127.0.0.1 --port=8000",
+    "build": "npm --prefix frontend run build"
+  }
+}
