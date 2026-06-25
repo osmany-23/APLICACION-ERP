@@ -14,10 +14,7 @@
   "dependencies": {
     "apexcharts": "^3.41.0",
     "flatpickr": "^4.6.13",
-<<<<<<< HEAD
-=======
-    "framer-motion": "^12.40.0",
->>>>>>> origin/actualizacion-diseno
+    "framer-motion": "^12.41.0",
     "headlessui": "^0.0.0",
     "jsvectormap": "^1.5.3",
     "match-sorter": "^6.3.1",

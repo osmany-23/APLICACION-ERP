@@ -1,9 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-<<<<<<< HEAD
-=======
 import { motion, AnimatePresence } from 'framer-motion';
->>>>>>> origin/actualizacion-diseno
 import {
   FiAlertCircle,
   FiCheckCircle,
@@ -16,17 +13,12 @@ import {
 } from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError } from '../../services/api';
-<<<<<<< HEAD
-import CoverImage from '../../images/cover/cover-01.png';
-import LogoDark from '../../images/logo/logo-dark.svg';
-=======
 import CoverImage from '../../images/icon/fondo.jpg';
 import CompanyLogo from '../../images/icon/logo.png';
 import CompanyLogoClaro from '../../images/icon/logo_claro.png';
 import InventoryImage from '../../images/icon/cubo.png';
 import InvoiceImage from '../../images/icon/hoja-de-balance.png';
 import CalculatorImage from '../../images/icon/grafico-de-barras.png';
->>>>>>> origin/actualizacion-diseno
 
 type FormState = {
   username: string;
@@ -73,12 +65,9 @@ const SignIn = () => {
   const [submitting, setSubmitting] = useState(false);
   const [lockSeconds, setLockSeconds] = useState(0);
 
-<<<<<<< HEAD
-=======
   const defaultText = "Gestiona inventario, ventas, contabilidad y más desde una sola plataforma segura y eficiente.";
   const [activeText, setActiveText] = useState(defaultText);
 
->>>>>>> origin/actualizacion-diseno
   const redirectTo = useMemo(() => {
     const state = location.state as { from?: string } | null;
 
@@ -130,21 +119,12 @@ const SignIn = () => {
       if (error instanceof ApiError) {
         const validationErrors = error.errors
           ? Object.entries(error.errors).reduce<FormErrors>(
-<<<<<<< HEAD
-              (mappedErrors, [field, messages]) => ({
-                ...mappedErrors,
-                [field]: messages[0],
-              }),
-              {},
-            )
-=======
             (mappedErrors, [field, messages]) => ({
               ...mappedErrors,
               [field]: messages[0],
             }),
             {},
           )
->>>>>>> origin/actualizacion-diseno
           : {};
 
         if (error.status === 429) {
@@ -166,45 +146,6 @@ const SignIn = () => {
   }
 
   return (
-<<<<<<< HEAD
-    <main className="min-h-screen bg-slate-50 text-slate-900 dark:bg-boxdark-2 dark:text-white">
-      <div className="grid min-h-screen lg:grid-cols-[1.05fr_0.95fr]">
-        <section className="relative hidden overflow-hidden lg:block">
-          <img
-            src={CoverImage}
-            alt="Sistema ERP"
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-          <div className="absolute inset-0 bg-[#111827]/75" />
-          <div className="relative flex h-full flex-col justify-between p-12">
-            <div className="flex items-center gap-3">
-              <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-white/10 text-white ring-1 ring-white/20">
-                <FiShield size={24} />
-              </span>
-              <div>
-                <p className="text-lg font-semibold text-white">Sistema ERP</p>
-                <p className="text-sm text-white/70">Auto Repuestos Bryan</p>
-              </div>
-            </div>
-
-            <div className="max-w-xl">
-              <p className="mb-4 text-sm font-medium uppercase tracking-[0.28em] text-sky-200">
-                Acceso administrativo
-              </p>
-              <h1 className="text-4xl font-bold leading-tight text-white xl:text-5xl">
-                Inventario, ventas y contabilidad bajo una sola sesion segura.
-              </h1>
-              <div className="mt-8 grid grid-cols-3 gap-3">
-                {['Inventario', 'Facturacion', 'Contabilidad'].map((item) => (
-                  <div
-                    key={item}
-                    className="rounded-md border border-white/15 bg-white/10 px-4 py-3 text-sm font-medium text-white shadow-sm backdrop-blur"
-                  >
-                    {item}
-                  </div>
-                ))}
-              </div>
-=======
     <main className="flex min-h-screen items-center justify-center bg-[#F1F5F9] p-4 text-[#334155] dark:bg-[#0B1120] dark:text-slate-200 sm:p-8">
       <div className="flex w-full max-w-[1100px] flex-col overflow-hidden rounded-[2rem] bg-[#FFFFFF] shadow-2xl dark:bg-[#1E293B] lg:flex-row">
         <section className="relative hidden lg:block lg:w-1/2">
@@ -350,38 +291,10 @@ const SignIn = () => {
                   <p className="mt-1 text-xs text-slate-400">Protegemos tu información con los más altos estándares de seguridad.</p>
                 </div>
               </div>
->>>>>>> origin/actualizacion-diseno
             </div>
           </div>
         </section>
 
-<<<<<<< HEAD
-        <section className="flex items-center justify-center px-4 py-8 sm:px-6 lg:px-12">
-          <div className="w-full max-w-md">
-            <div className="mb-8 flex items-center justify-between">
-              <img src={LogoDark} alt="Sistema ERP" className="h-10 w-auto" />
-              <span className="rounded-md border border-stroke bg-white px-3 py-1 text-xs font-semibold text-slate-600 dark:border-strokedark dark:bg-boxdark dark:text-bodydark">
-                ERP
-              </span>
-            </div>
-
-            <div className="rounded-lg border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark sm:p-8">
-              <div className="mb-7">
-                <p className="mb-2 flex items-center gap-2 text-sm font-medium text-primary">
-                  <FiShield />
-                  Portal seguro
-                </p>
-                <h2 className="text-2xl font-bold text-black dark:text-white">
-                  Iniciar sesion
-                </h2>
-                <p className="mt-2 text-sm text-slate-500 dark:text-bodydark">
-                  Entra con tu usuario autorizado del ERP.
-                </p>
-              </div>
-
-              {errors.form && (
-                <div className="mb-5 flex gap-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200">
-=======
         <section className="flex w-full items-center justify-center p-6 sm:p-8 lg:w-1/2 lg:p-8">
           <div className="w-full max-w-md">
             <div className="mb-4 flex flex-col items-center justify-center text-center">
@@ -397,24 +310,13 @@ const SignIn = () => {
             <div className="w-full">
               {errors.form && (
                 <div className="mb-4 flex gap-2 rounded-md border border-[#DC2626]/20 bg-[#DC2626]/5 px-3 py-2 text-xs text-[#DC2626] dark:border-[#DC2626]/40 dark:bg-[#DC2626]/10 dark:text-red-200">
->>>>>>> origin/actualizacion-diseno
                   <FiAlertCircle className="mt-0.5 shrink-0" />
                   <span>{errors.form}</span>
                 </div>
               )}
 
               <form onSubmit={handleSubmit} noValidate>
-<<<<<<< HEAD
-                <div className="mb-4">
-                  <label
-                    htmlFor="username"
-                    className="mb-2 block text-sm font-medium text-black dark:text-white"
-                  >
-                    Usuario o correo
-                  </label>
-=======
                 <div className="mb-3">
->>>>>>> origin/actualizacion-diseno
                   <div className="relative">
                     <FiUser className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
@@ -430,20 +332,6 @@ const SignIn = () => {
                           ...validateForm({ ...form, password: 'validpass' }),
                         }))
                       }
-<<<<<<< HEAD
-                      placeholder="admin"
-                      autoComplete="username"
-                      aria-invalid={Boolean(errors.username)}
-                      className={`w-full rounded-md border bg-transparent py-3 pl-11 pr-4 text-black outline-none transition focus:border-primary dark:bg-form-input dark:text-white ${
-                        errors.username
-                          ? 'border-red-400'
-                          : 'border-stroke dark:border-form-strokedark'
-                      }`}
-                    />
-                  </div>
-                  {errors.username && (
-                    <p className="mt-2 text-sm text-red-600 dark:text-red-300">
-=======
                       placeholder="Ingrese correo electrónico"
                       autoComplete="username"
                       aria-invalid={Boolean(errors.username)}
@@ -455,23 +343,12 @@ const SignIn = () => {
                   </div>
                   {errors.username && (
                     <p className="mt-2 text-sm text-[#DC2626]">
->>>>>>> origin/actualizacion-diseno
                       {errors.username}
                     </p>
                   )}
                 </div>
 
-<<<<<<< HEAD
-                <div className="mb-4">
-                  <label
-                    htmlFor="password"
-                    className="mb-2 block text-sm font-medium text-black dark:text-white"
-                  >
-                    Contrasena
-                  </label>
-=======
                 <div className="mb-3">
->>>>>>> origin/actualizacion-diseno
                   <div className="relative">
                     <FiLock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
@@ -487,16 +364,6 @@ const SignIn = () => {
                           password: validateForm(form).password,
                         }))
                       }
-<<<<<<< HEAD
-                      placeholder="Minimo 8 caracteres"
-                      autoComplete="current-password"
-                      aria-invalid={Boolean(errors.password)}
-                      className={`w-full rounded-md border bg-transparent py-3 pl-11 pr-12 text-black outline-none transition focus:border-primary dark:bg-form-input dark:text-white ${
-                        errors.password
-                          ? 'border-red-400'
-                          : 'border-stroke dark:border-form-strokedark'
-                      }`}
-=======
                       placeholder="Introducir la contraseña"
                       autoComplete="current-password"
                       aria-invalid={Boolean(errors.password)}
@@ -504,16 +371,11 @@ const SignIn = () => {
                         ? 'border-[#DC2626]'
                         : 'border-stroke dark:border-form-strokedark'
                         }`}
->>>>>>> origin/actualizacion-diseno
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword((visible) => !visible)}
-<<<<<<< HEAD
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-primary"
-=======
                       className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-[#0078D4]"
->>>>>>> origin/actualizacion-diseno
                       aria-label={
                         showPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'
                       }
@@ -521,60 +383,35 @@ const SignIn = () => {
                       {showPassword ? <FiEyeOff /> : <FiEye />}
                     </button>
                   </div>
-<<<<<<< HEAD
-                  <div className="mt-2 flex items-center justify-between gap-3 text-sm">
-                    {errors.password ? (
-                      <p className="text-red-600 dark:text-red-300">
-=======
                   <div className="mt-1.5 flex items-center justify-between gap-3 text-xs">
                     {errors.password ? (
                       <p className="text-[#DC2626]">
->>>>>>> origin/actualizacion-diseno
                         {errors.password}
                       </p>
                     ) : (
                       <p className="flex items-center gap-1.5 text-slate-500 dark:text-bodydark">
                         {passwordReady && (
-<<<<<<< HEAD
-                          <FiCheckCircle className="text-emerald-500" />
-=======
                           <FiCheckCircle className="text-[#16A34A]" />
->>>>>>> origin/actualizacion-diseno
                         )}
                         Validacion local activa
                       </p>
                     )}
                     {lockSeconds > 0 && (
-<<<<<<< HEAD
-                      <span className="font-medium text-amber-600">
-=======
                       <span className="font-medium text-[#F59E0B]">
->>>>>>> origin/actualizacion-diseno
                         {lockSeconds}s
                       </span>
                     )}
                   </div>
                 </div>
 
-<<<<<<< HEAD
-                <div className="mb-6 flex items-center justify-between gap-4">
-                  <label className="flex cursor-pointer items-center gap-3 text-sm text-slate-600 dark:text-bodydark">
-=======
                 <div className="mb-4 flex items-center justify-between gap-4">
                   <label className="flex cursor-pointer items-center gap-2 text-[13px] text-slate-600 dark:text-bodydark">
->>>>>>> origin/actualizacion-diseno
                     <input
                       type="checkbox"
                       checked={form.remember}
                       onChange={(event) =>
                         updateField('remember', event.target.checked)
                       }
-<<<<<<< HEAD
-                      className="h-4 w-4 rounded border-stroke text-primary focus:ring-primary"
-                    />
-                    Mantener sesion
-                  </label>
-=======
                       className="h-4 w-4 rounded border-stroke text-[#0078D4] focus:ring-[#0078D4] dark:border-strokedark"
                     />
                     Recordarme
@@ -582,19 +419,11 @@ const SignIn = () => {
                   <a href="#" className="text-[13px] font-medium text-[#0078D4] hover:underline">
                     Has olvidado tu contraseña ?
                   </a>
->>>>>>> origin/actualizacion-diseno
                 </div>
 
                 <button
                   type="submit"
                   disabled={!canSubmit}
-<<<<<<< HEAD
-                  className="flex w-full items-center justify-center gap-2 rounded-md border border-primary bg-primary px-4 py-3 font-medium text-white transition hover:bg-opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  {submitting && <FiLoader className="animate-spin" />}
-                  {lockSeconds > 0 ? 'Espera para intentar' : 'Entrar al sistema'}
-                </button>
-=======
                   className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#0078D4] bg-[#0078D4] px-4 py-3 text-[15px] font-medium text-white transition hover:bg-[#0078D4]/90 disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   {submitting && <FiLoader className="animate-spin" />}
@@ -605,7 +434,6 @@ const SignIn = () => {
                   <FiShield className="text-[#0078D4]" />
                   Seguro, rápido y confiable
                 </div>
->>>>>>> origin/actualizacion-diseno
               </form>
             </div>
           </div>

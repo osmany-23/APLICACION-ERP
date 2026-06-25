@@ -11,7 +11,10 @@ import Chart from './pages/Chart';
 import ECommerce from './pages/Dashboard/ECommerce';
 import FormElements from './pages/Form/FormElements';
 import FormLayout from './pages/Form/FormLayout';
+import ProductCatalogs from './pages/ProductCatalogs';
+import Products from './pages/Products';
 import Profile from './pages/Profile';
+import RelationCatalogs from './pages/RelationCatalogs';
 import Settings from './pages/Settings';
 import Tables from './pages/Tables';
 import Alerts from './pages/UiElements/Alerts';
@@ -37,6 +40,87 @@ function ProtectedAppRoutes() {
               <>
                 <PageTitle title="Calendario | Sistema ERP" />
                 <Calendar />
+              </>
+            }
+          />
+          <Route
+            path="/products"
+            element={
+              <>
+                <PageTitle title="Productos | Sistema ERP" />
+                <Products />
+              </>
+            }
+          />
+          <Route
+            path="/products/brands"
+            element={
+              <>
+                <PageTitle title="Marcas | Sistema ERP" />
+                <ProductCatalogs catalog="brands" />
+              </>
+            }
+          />
+          <Route
+            path="/products/categories"
+            element={
+              <>
+                <PageTitle title="Categorias | Sistema ERP" />
+                <ProductCatalogs catalog="categories" />
+              </>
+            }
+          />
+          <Route
+            path="/products/subcategories"
+            element={
+              <>
+                <PageTitle title="Subcategorias | Sistema ERP" />
+                <ProductCatalogs catalog="subcategories" />
+              </>
+            }
+          />
+          <Route
+            path="/products/units"
+            element={
+              <>
+                <PageTitle title="Unidades | Sistema ERP" />
+                <ProductCatalogs catalog="units" />
+              </>
+            }
+          />
+          <Route
+            path="/relations/suppliers"
+            element={
+              <>
+                <PageTitle title="Proveedores | Sistema ERP" />
+                <RelationCatalogs relation="suppliers" />
+              </>
+            }
+          />
+          <Route
+            path="/relations/warehouses"
+            element={
+              <>
+                <PageTitle title="Almacenes | Sistema ERP" />
+                <RelationCatalogs relation="warehouses" />
+              </>
+            }
+          />
+          <Route
+            path="/relations/branches"
+            element={
+              <>
+                <PageTitle title="Sucursales | Sistema ERP" />
+                <RelationCatalogs relation="branches" />
+              </>
+            }
+          />
+          <Route
+            path="/relations/company"
+            element={
+              <>
+                <PageTitle title="Empresa | Sistema ERP" />
+                <RelationCatalogs relation="companies" />
               </>
             }
           />
