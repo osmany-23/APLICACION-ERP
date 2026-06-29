@@ -187,7 +187,10 @@ class ProductCatalogController extends Controller
             ->selectSub(function ($query) use ($companyId) {
                 $query->from('products')
                     ->selectRaw('COUNT(*)')
-                    ->whereColumn('products.unit_id', 'units.id')
+                    ->where(function ($query) {
+                        $query->whereColumn('products.purchase_unit_id', 'units.id')
+                            ->orWhereColumn('products.sale_unit_id', 'units.id');
+                    })
                     ->where('products.company_id', $companyId);
             }, 'products_count')
             ->orderBy('units.name')
@@ -406,7 +409,7 @@ class ProductCatalogController extends Controller
             return 'No se puede eliminar la marca porque tiene productos relacionados.';
         }
 
-        if ($catalog === 'units' && $this->productsUsing($companyId, 'unit_id', $id) > 0) {
+        if ($catalog === 'units' && $this->productsUsingUnit($companyId, $id) > 0) {
             return 'No se puede eliminar la unidad porque tiene productos relacionados.';
         }
 
@@ -437,6 +440,17 @@ class ProductCatalogController extends Controller
         return DB::table('products')
             ->where('company_id', $companyId)
             ->where($field, $id)
+            ->count();
+    }
+
+    private function productsUsingUnit(int $companyId, int $id): int
+    {
+        return DB::table('products')
+            ->where('company_id', $companyId)
+            ->where(function ($query) use ($id) {
+                $query->where('purchase_unit_id', $id)
+                    ->orWhere('sale_unit_id', $id);
+            })
             ->count();
     }
 

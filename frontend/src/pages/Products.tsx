@@ -23,7 +23,6 @@ import {
   FiEye,
   FiFilePlus,
   FiImage,
-  FiMoreVertical,
   FiPackage,
   FiPlus,
   FiRefreshCw,
@@ -34,12 +33,17 @@ import {
   FiUpload,
   FiX,
 } from 'react-icons/fi';
-import ClickOutside from '../components/ClickOutside';
 import { useAuth } from '../context/AuthContext';
 import { ApiError, apiRequest } from '../services/api';
 
 type ProductStatus = 'Activo' | 'Inactivo';
 type DialogMode = 'create' | 'edit' | 'details' | 'kardex' | null;
+type TaxType = 'EXEMPT' | 'TAXABLE';
+type InventoryStatus =
+  | 'RECEIVED'
+  | 'PENDING_RECEIPT'
+  | 'IN_TRANSIT'
+  | 'RESERVED';
 
 type ProductRecord = {
   id: number;
@@ -47,7 +51,9 @@ type ProductRecord = {
   company: string;
   imageUrl: string | null;
   name: string;
+  fullName: string;
   code: string;
+  barcode: string;
   supplierId: number | null;
   supplier: string;
   categoryId: number | null;
@@ -58,10 +64,25 @@ type ProductRecord = {
   brand: string;
   unitId: number | null;
   unit: string;
+  purchaseUnitId: number | null;
+  purchaseUnit: string;
+  saleUnitId: number | null;
+  saleUnit: string;
+  conversionFactor: number;
   salePrice: number;
+  salePriceWithTax: number;
+  taxType: TaxType;
+  taxPercentage: number;
   cost: number;
   stock: number;
   minStock: number;
+  maxStock: number | null;
+  allowNegativeStock: boolean;
+  managesLots: boolean;
+  managesExpiration: boolean;
+  lotNumber: string;
+  expirationDate: string;
+  inventoryStatus: InventoryStatus;
   warehouseId: number | null;
   warehouse: string;
   branchId: number | null;
@@ -69,13 +90,24 @@ type ProductRecord = {
   status: ProductStatus;
   description: string;
   model: string;
+  physicalLocation: string;
+  isInventory: boolean;
+  isService: boolean;
+  isKit: boolean;
+  allowSale: boolean;
+  allowPurchase: boolean;
+  isFavorite: boolean;
+  notes: string;
+  observations: string;
 };
 
 type ProductDraft = {
   companyId: string;
   company: string;
   name: string;
+  fullName: string;
   code: string;
+  barcode: string;
   supplierId: string;
   supplier: string;
   categoryId: string;
@@ -86,16 +118,40 @@ type ProductDraft = {
   brand: string;
   unitId: string;
   unit: string;
+  purchaseUnitId: string;
+  purchaseUnit: string;
+  saleUnitId: string;
+  saleUnit: string;
+  conversionFactor: string;
   salePrice: string;
+  taxType: TaxType;
+  taxPercentage: string;
   cost: string;
   stock: string;
   minStock: string;
+  maxStock: string;
+  allowNegativeStock: boolean;
+  managesLots: boolean;
+  managesExpiration: boolean;
+  lotNumber: string;
+  expirationDate: string;
+  inventoryStatus: InventoryStatus;
   warehouseId: string;
   warehouse: string;
   branchId: string;
   branch: string;
   status: ProductStatus;
   description: string;
+  model: string;
+  physicalLocation: string;
+  isInventory: boolean;
+  isService: boolean;
+  isKit: boolean;
+  allowSale: boolean;
+  allowPurchase: boolean;
+  isFavorite: boolean;
+  notes: string;
+  observations: string;
   imageUrl: string;
 };
 
@@ -105,7 +161,9 @@ type ProductApiRecord = {
   company?: string | null;
   image_url: string | null;
   name: string | null;
+  full_name?: string | null;
   code: string | null;
+  barcode?: string | null;
   supplier_id?: number | string | null;
   supplier?: string | null;
   category_id?: number | string | null;
@@ -116,10 +174,26 @@ type ProductApiRecord = {
   brand: string | null;
   unit_id?: number | string | null;
   unit: string | null;
+  purchase_unit_id?: number | string | null;
+  purchase_unit?: string | null;
+  sale_unit_id?: number | string | null;
+  sale_unit?: string | null;
+  conversion_factor?: number | string | null;
   sale_price: number | string | null;
+  sale_price_with_tax?: number | string | null;
+  tax_type?: string | null;
+  tax_percentage?: number | string | null;
   cost: number | string | null;
   stock: number | string | null;
+  initial_stock?: number | string | null;
   minimum_stock: number | string | null;
+  maximum_stock?: number | string | null;
+  allow_negative_stock?: boolean | number | string | null;
+  manages_lots?: boolean | number | string | null;
+  manages_expiration?: boolean | number | string | null;
+  lot_number?: string | null;
+  expiration_date?: string | null;
+  inventory_status?: InventoryStatus | null;
   warehouse_id?: number | string | null;
   warehouse?: string | null;
   branch_id?: number | string | null;
@@ -128,6 +202,15 @@ type ProductApiRecord = {
   status_label?: string | null;
   description?: string | null;
   model?: string | null;
+  physical_location?: string | null;
+  is_inventory?: boolean | number | string | null;
+  is_service?: boolean | number | string | null;
+  is_kit?: boolean | number | string | null;
+  allow_sale?: boolean | number | string | null;
+  allow_purchase?: boolean | number | string | null;
+  is_favorite?: boolean | number | string | null;
+  notes?: string | null;
+  observations?: string | null;
 };
 
 type ProductsResponse = {
@@ -161,6 +244,11 @@ type CatalogResponse = {
 type ProductMutationResponse = {
   message?: string;
   product: ProductApiRecord;
+};
+
+type ProductShowResponse = {
+  product?: ProductApiRecord;
+  data?: ProductApiRecord;
 };
 
 type ProductDeleteResponse = {
@@ -198,7 +286,9 @@ const emptyDraft: ProductDraft = {
   companyId: '',
   company: '',
   name: '',
+  fullName: '',
   code: '',
+  barcode: '',
   supplierId: '',
   supplier: '',
   categoryId: '',
@@ -209,16 +299,40 @@ const emptyDraft: ProductDraft = {
   brand: 'Generica',
   unitId: '',
   unit: 'UND',
+  purchaseUnitId: '',
+  purchaseUnit: 'UND',
+  saleUnitId: '',
+  saleUnit: 'UND',
+  conversionFactor: '1',
   salePrice: '',
+  taxType: 'EXEMPT',
+  taxPercentage: '0',
   cost: '',
   stock: '0',
   minStock: '0',
+  maxStock: '',
+  allowNegativeStock: false,
+  managesLots: false,
+  managesExpiration: false,
+  lotNumber: '',
+  expirationDate: '',
+  inventoryStatus: 'RECEIVED',
   warehouseId: '',
   warehouse: '',
   branchId: '',
   branch: '',
   status: 'Activo',
   description: '',
+  model: '',
+  physicalLocation: '',
+  isInventory: true,
+  isService: false,
+  isKit: false,
+  allowSale: true,
+  allowPurchase: true,
+  isFavorite: false,
+  notes: '',
+  observations: '',
   imageUrl: '',
 };
 
@@ -238,6 +352,9 @@ const inputClass =
 const selectClass =
   'h-12 w-full appearance-none rounded-lg border border-stroke bg-white px-4 pr-10 text-sm text-black outline-none transition focus:border-primary dark:border-strokedark dark:bg-boxdark dark:text-white';
 
+const textareaClass =
+  'min-h-24 w-full rounded-lg border border-stroke bg-white px-4 py-3 text-sm text-black outline-none transition focus:border-primary dark:border-strokedark dark:bg-boxdark dark:text-white';
+
 function readNumber(value: unknown) {
   const parsed = Number(value ?? 0);
 
@@ -248,6 +365,38 @@ function parseNumber(value: string) {
   const parsed = Number(value.replace(/,/g, '').trim());
 
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function readBoolean(value: unknown, defaultValue = false) {
+  if (value === null || value === undefined || value === '') {
+    return defaultValue;
+  }
+
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  return ['1', 'true', 'si', 'sí', 'yes'].includes(
+    String(value).trim().toLowerCase(),
+  );
+}
+
+function normalizeTaxType(value: unknown): TaxType {
+  return ['taxable', 'gravado'].includes(String(value || '').toLowerCase())
+    ? 'TAXABLE'
+    : 'EXEMPT';
+}
+
+function formatOptionName(option?: CatalogOption | null) {
+  if (!option) {
+    return '';
+  }
+
+  return option.short_name || option.name || '';
+}
+
+function taxLabel(value: TaxType) {
+  return value === 'TAXABLE' ? 'Gravado' : 'Exento';
 }
 
 function normalizeText(value: string) {
@@ -304,7 +453,9 @@ function mapProduct(product: ProductApiRecord): ProductRecord {
     company: product.company || '',
     imageUrl: product.image_url || null,
     name: product.name || 'Producto sin nombre',
+    fullName: product.full_name || '',
     code: product.code || '',
+    barcode: product.barcode || '',
     supplierId: product.supplier_id ? Number(product.supplier_id) : null,
     supplier: product.supplier || 'Sin proveedor',
     categoryId: product.category_id ? Number(product.category_id) : null,
@@ -315,10 +466,30 @@ function mapProduct(product: ProductApiRecord): ProductRecord {
     brand: product.brand || 'Generica',
     unitId: product.unit_id ? Number(product.unit_id) : null,
     unit: product.unit || 'UND',
+    purchaseUnitId: product.purchase_unit_id
+      ? Number(product.purchase_unit_id)
+      : null,
+    purchaseUnit: product.purchase_unit || product.unit || 'UND',
+    saleUnitId: product.sale_unit_id ? Number(product.sale_unit_id) : null,
+    saleUnit: product.sale_unit || product.unit || 'UND',
+    conversionFactor: readNumber(product.conversion_factor || 1),
     salePrice: readNumber(product.sale_price),
+    salePriceWithTax: readNumber(product.sale_price_with_tax),
+    taxType: normalizeTaxType(product.tax_type),
+    taxPercentage: readNumber(product.tax_percentage),
     cost: readNumber(product.cost),
-    stock: readNumber(product.stock),
+    stock: readNumber(product.initial_stock ?? product.stock),
     minStock: readNumber(product.minimum_stock),
+    maxStock:
+      product.maximum_stock === null || product.maximum_stock === undefined
+        ? null
+        : readNumber(product.maximum_stock),
+    allowNegativeStock: readBoolean(product.allow_negative_stock),
+    managesLots: readBoolean(product.manages_lots),
+    managesExpiration: readBoolean(product.manages_expiration),
+    lotNumber: product.lot_number || '',
+    expirationDate: product.expiration_date || '',
+    inventoryStatus: product.inventory_status || 'RECEIVED',
     warehouseId: product.warehouse_id ? Number(product.warehouse_id) : null,
     warehouse: product.warehouse || 'Sin almacen',
     branchId: product.branch_id ? Number(product.branch_id) : null,
@@ -326,6 +497,15 @@ function mapProduct(product: ProductApiRecord): ProductRecord {
     status,
     description: product.description || '',
     model: product.model || '',
+    physicalLocation: product.physical_location || '',
+    isInventory: readBoolean(product.is_inventory, true),
+    isService: readBoolean(product.is_service),
+    isKit: readBoolean(product.is_kit),
+    allowSale: readBoolean(product.allow_sale, true),
+    allowPurchase: readBoolean(product.allow_purchase, true),
+    isFavorite: readBoolean(product.is_favorite),
+    notes: product.notes || '',
+    observations: product.observations || '',
   };
 }
 
@@ -338,12 +518,30 @@ function mapCatalogOption(option: CatalogOption): CatalogOption {
   };
 }
 
+function findOptionId(options: CatalogOption[], value: string) {
+  const search = normalizeText(value);
+
+  if (!search) {
+    return '';
+  }
+
+  const option = options.find(
+    (item) =>
+      normalizeText(item.name) === search ||
+      normalizeText(item.short_name || '') === search,
+  );
+
+  return option?.id ? String(option.id) : '';
+}
+
 function toDraft(product: ProductRecord): ProductDraft {
   return {
     companyId: product.companyId ? String(product.companyId) : '',
     company: product.company,
     name: product.name,
+    fullName: product.fullName,
     code: product.code,
+    barcode: product.barcode,
     supplierId: product.supplierId ? String(product.supplierId) : '',
     supplier: product.supplier,
     categoryId: product.categoryId ? String(product.categoryId) : '',
@@ -354,16 +552,40 @@ function toDraft(product: ProductRecord): ProductDraft {
     brand: product.brand,
     unitId: product.unitId ? String(product.unitId) : '',
     unit: product.unit,
+    purchaseUnitId: product.purchaseUnitId ? String(product.purchaseUnitId) : '',
+    purchaseUnit: product.purchaseUnit,
+    saleUnitId: product.saleUnitId ? String(product.saleUnitId) : '',
+    saleUnit: product.saleUnit,
+    conversionFactor: String(product.conversionFactor || 1),
     salePrice: String(product.salePrice),
+    taxType: product.taxType,
+    taxPercentage: String(product.taxPercentage),
     cost: String(product.cost),
     stock: String(product.stock),
     minStock: String(product.minStock),
+    maxStock: product.maxStock === null ? '' : String(product.maxStock),
+    allowNegativeStock: product.allowNegativeStock,
+    managesLots: product.managesLots,
+    managesExpiration: product.managesExpiration,
+    lotNumber: product.lotNumber,
+    expirationDate: product.expirationDate,
+    inventoryStatus: product.inventoryStatus,
     warehouseId: product.warehouseId ? String(product.warehouseId) : '',
     warehouse: product.warehouse,
     branchId: product.branchId ? String(product.branchId) : '',
     branch: product.branch,
     status: product.status,
     description: product.description,
+    model: product.model,
+    physicalLocation: product.physicalLocation,
+    isInventory: product.isInventory,
+    isService: product.isService,
+    isKit: product.isKit,
+    allowSale: product.allowSale,
+    allowPurchase: product.allowPurchase,
+    isFavorite: product.isFavorite,
+    notes: product.notes,
+    observations: product.observations,
     imageUrl: product.imageUrl || '',
   };
 }
@@ -441,6 +663,9 @@ function parseProductCsv(text: string) {
 
       const name = pick('nombre', 'name');
       const code = pick('codigo', 'code');
+      const cost = pick('costo', 'cost') || '0';
+      const salePrice =
+        pick('precio_venta', 'precio', 'sale_price') || cost || '0';
 
       if (!name || !code) {
         return null;
@@ -454,8 +679,8 @@ function parseProductCsv(text: string) {
         subcategory: pick('subcategoria', 'subcategory'),
         brand: (pick('marca', 'brand') || 'Generica').toUpperCase(),
         unit: (pick('unidad', 'unit') || 'UND').toUpperCase(),
-        salePrice: pick('precio_venta', 'precio', 'sale_price') || '0',
-        cost: pick('costo', 'cost') || '0',
+        salePrice,
+        cost,
         stock: pick('stock') || '0',
         minStock: pick('stock_minimo', 'minimum_stock') || '0',
         status: normalizeStatus(pick('estado', 'status') || 'Activo'),
@@ -468,17 +693,23 @@ function parseProductCsv(text: string) {
 
 function Field({
   children,
+  error,
   label,
+  required = false,
 }: {
   children: ReactNode;
+  error?: string;
   label: string;
+  required?: boolean;
 }) {
   return (
     <label className="block">
       <span className="mb-2 block text-sm font-semibold text-black dark:text-white">
         {label}
+        {required && <span className="text-red-500"> *</span>}
       </span>
       {children}
+      {error && <span className="mt-2 block text-xs font-semibold text-red-500">{error}</span>}
     </label>
   );
 }
@@ -489,6 +720,45 @@ function SelectWrap({ children }: { children: ReactNode }) {
       {children}
       <FiChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-black dark:text-white" />
     </div>
+  );
+}
+
+function FormCard({
+  children,
+  title,
+}: {
+  children: ReactNode;
+  title: string;
+}) {
+  return (
+    <section className="rounded-lg border border-stroke p-5 dark:border-strokedark">
+      <h3 className="mb-5 text-base font-black uppercase text-black dark:text-white">
+        {title}
+      </h3>
+      {children}
+    </section>
+  );
+}
+
+function ToggleField({
+  checked,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  label: string;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex h-12 items-center justify-between gap-3 rounded-lg border border-stroke bg-white px-4 text-sm font-semibold text-black dark:border-strokedark dark:bg-boxdark dark:text-white">
+      <span>{label}</span>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="h-5 w-5 accent-primary"
+      />
+    </label>
   );
 }
 
@@ -540,7 +810,7 @@ const Products = () => {
   const [supplierFilter, setSupplierFilter] = useState('Todos');
   const [warehouseFilter, setWarehouseFilter] = useState('Todos');
   const [currentPage, setCurrentPage] = useState(1);
-  const [activeMenu, setActiveMenu] = useState<number | null>(null);
+  const [actionProductId, setActionProductId] = useState<number | null>(null);
   const [dialogMode, setDialogMode] = useState<DialogMode>(null);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(
     null,
@@ -746,8 +1016,87 @@ const Products = () => {
     filteredProducts.length,
     currentPage * ITEMS_PER_PAGE,
   );
+  const previewSalePrice = parseNumber(draft.salePrice);
+  const previewTaxPercentage =
+    draft.taxType === 'TAXABLE' ? parseNumber(draft.taxPercentage) : 0;
+  const previewTaxAmount = previewSalePrice * (previewTaxPercentage / 100);
+  const previewFinalPrice = previewSalePrice + previewTaxAmount;
+  const draftErrors = useMemo(() => {
+    const errors: Partial<Record<keyof ProductDraft, string>> = {};
+    const code = normalizeText(draft.code);
+    const barcode = normalizeText(draft.barcode);
+    const currentProductId =
+      dialogMode === 'edit' ? selectedProductId || undefined : undefined;
+    const duplicatedCode = products.some(
+      (product) =>
+        product.id !== currentProductId &&
+        normalizeText(product.code) === code,
+    );
+    const duplicatedBarcode =
+      barcode &&
+      products.some(
+        (product) =>
+          product.id !== currentProductId &&
+          normalizeText(product.barcode) === barcode,
+      );
+    const conversionFactor = parseNumber(draft.conversionFactor);
+    const cost = parseNumber(draft.cost);
+    const stock = parseNumber(draft.stock);
+    const minStock = parseNumber(draft.minStock);
+    const maxStock =
+      draft.maxStock.trim() === '' ? null : parseNumber(draft.maxStock);
+    const salePrice = parseNumber(draft.salePrice);
+    const taxPercentage = parseNumber(draft.taxPercentage);
 
-  function updateDraft(field: keyof ProductDraft, value: string) {
+    if (!draft.name.trim()) errors.name = 'Ingresa el nombre corto.';
+    if (!draft.code.trim()) errors.code = 'Ingresa el codigo interno.';
+    if (duplicatedCode) errors.code = 'Este codigo ya existe.';
+    if (duplicatedBarcode) errors.barcode = 'Este codigo de barras ya existe.';
+    if (!draft.supplierId) errors.supplierId = 'Selecciona proveedor.';
+    if (!draft.categoryId) errors.categoryId = 'Selecciona categoria.';
+    if (!draft.brandId) errors.brandId = 'Selecciona marca.';
+    if (!draft.purchaseUnitId) errors.purchaseUnitId = 'Selecciona unidad.';
+    if (!draft.saleUnitId) errors.saleUnitId = 'Selecciona unidad.';
+    if (!draft.warehouseId) errors.warehouseId = 'Selecciona almacen.';
+    if (conversionFactor <= 0) {
+      errors.conversionFactor = 'Debe ser mayor que cero.';
+    }
+    if (draft.cost.trim() === '' || cost < 0) errors.cost = 'Costo invalido.';
+    if (draft.salePrice.trim() === '' || salePrice < 0) {
+      errors.salePrice = 'Precio invalido.';
+    }
+    if (draft.allowSale && salePrice <= 0) {
+      errors.salePrice = 'Debe ser mayor que cero para vender.';
+    }
+    if (draft.taxType === 'TAXABLE' && draft.taxPercentage.trim() === '') {
+      errors.taxPercentage = 'Ingresa el porcentaje.';
+    }
+    if (draft.taxType === 'TAXABLE' && (taxPercentage < 0 || taxPercentage > 100)) {
+      errors.taxPercentage = 'Debe estar entre 0 y 100.';
+    }
+    if (stock < 0) errors.stock = 'No puede ser negativo.';
+    if (minStock < 0) errors.minStock = 'No puede ser negativo.';
+    if (maxStock !== null && maxStock < 0) errors.maxStock = 'No puede ser negativo.';
+    if (maxStock !== null && minStock > maxStock) {
+      errors.maxStock = 'Debe ser mayor o igual al minimo.';
+    }
+    if (draft.isInventory && draft.isService) {
+      errors.isService = 'Servicio e inventariable no pueden estar activos juntos.';
+    }
+    if (draft.managesLots && !draft.lotNumber.trim()) {
+      errors.lotNumber = 'Ingresa el lote.';
+    }
+    if (draft.managesExpiration && !draft.expirationDate) {
+      errors.expirationDate = 'Ingresa la fecha.';
+    }
+
+    return errors;
+  }, [dialogMode, draft, products, selectedProductId]);
+
+  function updateDraft<K extends keyof ProductDraft>(
+    field: K,
+    value: ProductDraft[K],
+  ) {
     setDraft((currentDraft) => ({
       ...currentDraft,
       [field]: value,
@@ -755,6 +1104,10 @@ const Products = () => {
   }
 
   function createEmptyDraft(): ProductDraft {
+    const defaultCategory = catalogs.categories[0];
+    const defaultBrand = catalogs.brands[0];
+    const defaultUnit = catalogs.units[0];
+    const defaultSupplier = catalogs.suppliers[0];
     const defaultBranch =
       catalogs.branches.find((branch) => Number(branch.id) === user?.branch?.id) ||
       catalogs.branches[0];
@@ -775,6 +1128,18 @@ const Products = () => {
       ...emptyDraft,
       companyId: user?.company?.id ? String(user.company.id) : '',
       company: user?.company?.name || '',
+      supplierId: defaultSupplier?.id ? String(defaultSupplier.id) : '',
+      supplier: defaultSupplier?.name || '',
+      categoryId: defaultCategory?.id ? String(defaultCategory.id) : '',
+      category: defaultCategory?.name || 'General',
+      brandId: defaultBrand?.id ? String(defaultBrand.id) : '',
+      brand: defaultBrand?.name || 'Generica',
+      unitId: defaultUnit?.id ? String(defaultUnit.id) : '',
+      unit: formatOptionName(defaultUnit) || 'UND',
+      purchaseUnitId: defaultUnit?.id ? String(defaultUnit.id) : '',
+      purchaseUnit: formatOptionName(defaultUnit) || 'UND',
+      saleUnitId: defaultUnit?.id ? String(defaultUnit.id) : '',
+      saleUnit: formatOptionName(defaultUnit) || 'UND',
       branchId: branchFromWarehouse?.id ? String(branchFromWarehouse.id) : '',
       branch: branchFromWarehouse?.name || '',
       warehouseId: defaultWarehouse?.id ? String(defaultWarehouse.id) : '',
@@ -818,13 +1183,25 @@ const Products = () => {
     }));
   }
 
-  function handleUnitChange(value: string) {
+  function handlePurchaseUnitChange(value: string) {
     const unit = catalogs.units.find((option) => String(option.id) === value);
 
     setDraft((currentDraft) => ({
       ...currentDraft,
+      purchaseUnitId: value,
+      purchaseUnit: formatOptionName(unit) || 'UND',
+    }));
+  }
+
+  function handleSaleUnitChange(value: string) {
+    const unit = catalogs.units.find((option) => String(option.id) === value);
+
+    setDraft((currentDraft) => ({
+      ...currentDraft,
+      saleUnitId: value,
+      saleUnit: formatOptionName(unit) || 'UND',
       unitId: value,
-      unit: unit?.short_name || unit?.name || 'UND',
+      unit: formatOptionName(unit) || 'UND',
     }));
   }
 
@@ -881,12 +1258,57 @@ const Products = () => {
     setDialogMode('create');
   }
 
-  function openEditDialog(product: ProductRecord) {
-    setDraft(toDraft(product));
+  function upsertProduct(product: ProductRecord) {
+    setProducts((currentProducts) => {
+      const exists = currentProducts.some((item) => item.id === product.id);
+
+      if (!exists) {
+        return [...currentProducts, product];
+      }
+
+      return currentProducts.map((item) =>
+        item.id === product.id ? product : item,
+      );
+    });
+  }
+
+  async function loadProduct(productId: number) {
+    if (!token) {
+      throw new ApiError(401, 'No autenticado.');
+    }
+
+    const response = await apiRequest<ProductShowResponse>(
+      `/products/${productId}`,
+      {},
+      token,
+    );
+    const apiProduct = response.product || response.data;
+
+    if (!apiProduct) {
+      throw new ApiError(500, 'La API no devolvio el producto solicitado.');
+    }
+
+    const product = mapProduct(apiProduct);
+    upsertProduct(product);
+
+    return product;
+  }
+
+  async function openEditDialog(product: ProductRecord) {
+    setActionProductId(product.id);
     setFormError('');
-    setSelectedProductId(product.id);
-    setDialogMode('edit');
-    setActiveMenu(null);
+    setPageError('');
+
+    try {
+      const freshProduct = await loadProduct(product.id);
+      setDraft(toDraft(freshProduct));
+      setSelectedProductId(freshProduct.id);
+      setDialogMode('edit');
+    } catch (error) {
+      setPageError(getErrorMessage(error));
+    } finally {
+      setActionProductId(null);
+    }
   }
 
   async function loadKardex(productId: number) {
@@ -922,13 +1344,25 @@ const Products = () => {
     }
   }
 
-  function openProductDialog(product: ProductRecord, mode: 'details' | 'kardex') {
-    setSelectedProductId(product.id);
-    setDialogMode(mode);
-    setActiveMenu(null);
+  async function openProductDialog(
+    product: ProductRecord,
+    mode: 'details' | 'kardex',
+  ) {
+    setActionProductId(product.id);
+    setPageError('');
 
-    if (mode === 'kardex') {
-      void loadKardex(product.id);
+    try {
+      const freshProduct = await loadProduct(product.id);
+      setSelectedProductId(freshProduct.id);
+      setDialogMode(mode);
+
+      if (mode === 'kardex') {
+        void loadKardex(freshProduct.id);
+      }
+    } catch (error) {
+      setPageError(getErrorMessage(error));
+    } finally {
+      setActionProductId(null);
     }
   }
 
@@ -941,27 +1375,82 @@ const Products = () => {
   }
 
   function productPayload(productDraft: ProductDraft) {
+    const categoryId =
+      Number(productDraft.categoryId || findOptionId(catalogs.categories, productDraft.category)) ||
+      null;
+    const subcategoryId = Number(productDraft.subcategoryId) || null;
+    const brandId =
+      Number(productDraft.brandId || findOptionId(catalogs.brands, productDraft.brand)) ||
+      null;
+    const supplierId =
+      Number(productDraft.supplierId || findOptionId(catalogs.suppliers, productDraft.supplier)) ||
+      Number(catalogs.suppliers[0]?.id || 0) ||
+      null;
+    const purchaseUnitId =
+      Number(
+        productDraft.purchaseUnitId ||
+          productDraft.unitId ||
+          findOptionId(catalogs.units, productDraft.purchaseUnit || productDraft.unit),
+      ) ||
+      Number(catalogs.units[0]?.id || 0) ||
+      null;
+    const saleUnitId =
+      Number(
+        productDraft.saleUnitId ||
+          productDraft.unitId ||
+          findOptionId(catalogs.units, productDraft.saleUnit || productDraft.unit),
+      ) ||
+      Number(catalogs.units[0]?.id || 0) ||
+      null;
+    const branchId = Number(productDraft.branchId) || null;
+    const warehouseId =
+      Number(productDraft.warehouseId) || Number(catalogs.warehouses[0]?.id || 0) || null;
+
     return {
       company_id: Number(productDraft.companyId) || null,
       name: productDraft.name.trim().toUpperCase(),
+      full_name: productDraft.fullName.trim(),
       code: productDraft.code.trim(),
-      supplier_id: Number(productDraft.supplierId) || null,
-      branch_id: Number(productDraft.branchId) || null,
-      warehouse_id: Number(productDraft.warehouseId) || null,
-      category_id: Number(productDraft.categoryId) || null,
-      category: productDraft.category.trim() || 'General',
-      subcategory_id: Number(productDraft.subcategoryId) || null,
-      subcategory: productDraft.subcategory.trim(),
-      brand_id: Number(productDraft.brandId) || null,
-      brand: (productDraft.brand.trim() || 'Generica').toUpperCase(),
-      unit_id: Number(productDraft.unitId) || null,
-      unit: (productDraft.unit.trim() || 'UND').toUpperCase(),
+      barcode: productDraft.barcode.trim(),
+      supplier_id: supplierId,
+      branch_id: branchId,
+      warehouse_id: warehouseId,
+      category_id: categoryId,
+      subcategory_id: subcategoryId,
+      brand_id: brandId,
+      purchase_unit_id: purchaseUnitId,
+      sale_unit_id: saleUnitId,
+      conversion_factor: parseNumber(productDraft.conversionFactor),
       sale_price: parseNumber(productDraft.salePrice),
+      tax_type: productDraft.taxType,
+      tax_percentage:
+        productDraft.taxType === 'TAXABLE'
+          ? parseNumber(productDraft.taxPercentage)
+          : 0,
       cost: parseNumber(productDraft.cost),
+      initial_stock: parseNumber(productDraft.stock),
       stock: parseNumber(productDraft.stock),
+      inventory_status: productDraft.inventoryStatus,
       minimum_stock: parseNumber(productDraft.minStock),
+      maximum_stock:
+        productDraft.maxStock.trim() === '' ? null : parseNumber(productDraft.maxStock),
+      allow_negative_stock: productDraft.allowNegativeStock,
+      manages_lots: productDraft.managesLots,
+      manages_expiration: productDraft.managesExpiration,
+      lot_number: productDraft.lotNumber.trim(),
+      expiration_date: productDraft.expirationDate,
       status: productDraft.status,
       description: productDraft.description.trim(),
+      model: productDraft.model.trim(),
+      physical_location: productDraft.physicalLocation.trim(),
+      is_inventory: productDraft.isInventory,
+      is_service: productDraft.isService,
+      is_kit: productDraft.isKit,
+      allow_sale: productDraft.allowSale,
+      allow_purchase: productDraft.allowPurchase,
+      is_favorite: productDraft.isFavorite,
+      notes: productDraft.notes.trim(),
+      observations: productDraft.observations.trim(),
       image_url: productDraft.imageUrl.trim(),
     };
   }
@@ -983,16 +1472,11 @@ const Products = () => {
     return mapProduct(response.product);
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function saveProduct(createAnother = false) {
+    const firstError = Object.values(draftErrors)[0];
 
-    if (!draft.name.trim() || !draft.code.trim()) {
-      setFormError('Completa nombre y codigo del producto.');
-      return;
-    }
-
-    if (catalogs.warehouses.length > 0 && !draft.warehouseId) {
-      setFormError('Selecciona el almacen donde se registrara el stock.');
+    if (firstError) {
+      setFormError(firstError);
       return;
     }
 
@@ -1011,12 +1495,22 @@ const Products = () => {
           ? 'Producto actualizado en la base de datos.'
           : 'Producto creado en la base de datos.',
       );
-      closeDialog();
+
+      if (createAnother && dialogMode === 'create') {
+        setDraft(createEmptyDraft());
+      } else {
+        closeDialog();
+      }
     } catch (error) {
       setFormError(getErrorMessage(error));
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await saveProduct(false);
   }
 
   async function handleDelete(product: ProductRecord) {
@@ -1039,7 +1533,6 @@ const Products = () => {
         token,
       );
       setNotice(response.message);
-      setActiveMenu(null);
       await loadProducts();
     } catch (error) {
       setPageError(getErrorMessage(error));
@@ -1498,61 +1991,49 @@ const Products = () => {
                     <td className="max-w-60 px-4 py-5 text-sm font-semibold text-black dark:text-white">
                       {product.description || product.model || 'Sin descripcion'}
                     </td>
-                    <td className="px-4 py-5 text-center">
-                      <ClickOutside
-                        onClick={() => setActiveMenu(null)}
-                        className="relative inline-flex"
-                      >
+                    <td className="px-4 py-5">
+                      <div className="flex items-center justify-center gap-2">
                         <button
                           type="button"
-                          onClick={() =>
-                            setActiveMenu((currentMenu) =>
-                              currentMenu === product.id ? null : product.id,
-                            )
-                          }
-                          className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-primary text-primary transition hover:bg-primary hover:text-white"
-                          aria-label={`Opciones de ${product.name}`}
+                          onClick={() => void openProductDialog(product, 'details')}
+                          disabled={actionProductId === product.id}
+                          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-primary text-primary transition hover:bg-primary hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                          title="Ver detalles"
+                          aria-label={`Ver detalles de ${product.name}`}
                         >
-                          <FiMoreVertical className="h-5 w-5" />
+                          <FiEye className="h-5 w-5" />
                         </button>
-
-                        {activeMenu === product.id && (
-                          <div className="absolute right-0 top-13 z-99 w-52 rounded-lg border border-stroke bg-white py-2 text-left shadow-default dark:border-strokedark dark:bg-boxdark">
-                            <button
-                              type="button"
-                              onClick={() => openProductDialog(product, 'details')}
-                              className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-black transition hover:bg-gray dark:text-white dark:hover:bg-meta-4"
-                            >
-                              <FiEye className="h-5 w-5" />
-                              Ver detalles
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openEditDialog(product)}
-                              className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#0F9F37] transition hover:bg-gray dark:hover:bg-meta-4"
-                            >
-                              <FiEdit2 className="h-5 w-5" />
-                              Editar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openProductDialog(product, 'kardex')}
-                              className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-primary transition hover:bg-gray dark:hover:bg-meta-4"
-                            >
-                              <FiBarChart2 className="h-5 w-5" />
-                              Kardex
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void handleDelete(product)}
-                              className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-red-500 transition hover:bg-gray dark:hover:bg-meta-4"
-                            >
-                              <FiTrash2 className="h-5 w-5" />
-                              Eliminar
-                            </button>
-                          </div>
-                        )}
-                      </ClickOutside>
+                        <button
+                          type="button"
+                          onClick={() => void openEditDialog(product)}
+                          disabled={actionProductId === product.id}
+                          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#16A34A] text-[#0F9F37] transition hover:bg-[#16A34A] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                          title="Editar"
+                          aria-label={`Editar ${product.name}`}
+                        >
+                          <FiEdit2 className="h-5 w-5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void openProductDialog(product, 'kardex')}
+                          disabled={actionProductId === product.id}
+                          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#2563EB] text-[#2563EB] transition hover:bg-[#2563EB] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                          title="Kardex"
+                          aria-label={`Kardex de ${product.name}`}
+                        >
+                          <FiBarChart2 className="h-5 w-5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDelete(product)}
+                          disabled={actionProductId === product.id}
+                          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-red-500 text-red-500 transition hover:bg-red-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                          title="Eliminar"
+                          aria-label={`Eliminar ${product.name}`}
+                        >
+                          <FiTrash2 className="h-5 w-5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1653,15 +2134,12 @@ const Products = () => {
         <div className="fixed inset-0 z-99999 flex items-center justify-center bg-black/50 px-4 py-6">
           <form
             onSubmit={handleSubmit}
-            className="max-h-full w-full max-w-4xl overflow-y-auto rounded-lg border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark"
+            className="max-h-full w-full max-w-6xl overflow-y-auto rounded-lg border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark"
           >
             <div className="mb-6 flex items-center justify-between gap-4">
               <div>
                 <p className="text-xl font-black text-black dark:text-white">
                   {dialogMode === 'edit' ? 'Editar producto' : 'Nuevo producto'}
-                </p>
-                <p className="mt-1 text-sm text-slate-500">
-                  Los datos se guardan directamente en la base de datos.
                 </p>
               </div>
               <button
@@ -1679,173 +2157,608 @@ const Products = () => {
               </div>
             )}
 
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-              <Field label="Nombre">
-                <input
-                  value={draft.name}
-                  onChange={(event) => updateDraft('name', event.target.value)}
-                  className={inputClass}
-                  placeholder="ALTERNADOR"
-                />
-              </Field>
-              <Field label="Codigo">
-                <input
-                  value={draft.code}
-                  onChange={(event) => updateDraft('code', event.target.value)}
-                  className={inputClass}
-                  placeholder="785411466"
-                />
-              </Field>
-              <Field label="Categoria">
-                <SelectWrap>
-                  <select
-                    value={draft.categoryId}
-                    onChange={(event) => handleCategoryChange(event.target.value)}
-                    className={selectClass}
-                    disabled={loadingCatalogs}
+            <div className="space-y-5">
+              <FormCard title="Informacion general">
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                  <Field label="Empresa">
+                    <input
+                      value={draft.company}
+                      readOnly
+                      className={`${inputClass} bg-gray-50 dark:bg-meta-4`}
+                    />
+                  </Field>
+                  <Field label="Codigo interno" required error={draftErrors.code}>
+                    <input
+                      value={draft.code}
+                      onChange={(event) => updateDraft('code', event.target.value)}
+                      className={inputClass}
+                      placeholder="785411466"
+                    />
+                  </Field>
+                  <Field label="Codigo de barras" error={draftErrors.barcode}>
+                    <input
+                      value={draft.barcode}
+                      onChange={(event) =>
+                        updateDraft('barcode', event.target.value)
+                      }
+                      className={inputClass}
+                      placeholder="7501234567890"
+                    />
+                  </Field>
+                  <Field label="Nombre corto" required error={draftErrors.name}>
+                    <input
+                      value={draft.name}
+                      onChange={(event) => updateDraft('name', event.target.value)}
+                      className={inputClass}
+                      placeholder="ALTERNADOR"
+                    />
+                  </Field>
+                  <Field label="Nombre completo">
+                    <input
+                      value={draft.fullName}
+                      onChange={(event) =>
+                        updateDraft('fullName', event.target.value)
+                      }
+                      className={inputClass}
+                      placeholder="ALTERNADOR TOYOTA HILUX 2.8"
+                    />
+                  </Field>
+                  <Field label="Modelo">
+                    <input
+                      value={draft.model}
+                      onChange={(event) => updateDraft('model', event.target.value)}
+                      className={inputClass}
+                      placeholder="HILUX 2016-2024"
+                    />
+                  </Field>
+                  <Field
+                    label="Categoria"
+                    required
+                    error={draftErrors.categoryId}
                   >
-                    <option value="">General</option>
-                    {catalogs.categories.map((category) => (
-                      <option key={category.id} value={category.id}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
-                </SelectWrap>
-              </Field>
-              <Field label="Subcategoria">
-                <SelectWrap>
-                  <select
-                    value={draft.subcategoryId}
-                    onChange={(event) =>
-                      handleSubcategoryChange(event.target.value)
+                    <SelectWrap>
+                      <select
+                        value={draft.categoryId}
+                        onChange={(event) =>
+                          handleCategoryChange(event.target.value)
+                        }
+                        className={selectClass}
+                        disabled={loadingCatalogs}
+                      >
+                        <option value="">Selecciona categoria</option>
+                        {catalogs.categories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.name}
+                          </option>
+                        ))}
+                      </select>
+                    </SelectWrap>
+                  </Field>
+                  <Field label="Subcategoria">
+                    <SelectWrap>
+                      <select
+                        value={draft.subcategoryId}
+                        onChange={(event) =>
+                          handleSubcategoryChange(event.target.value)
+                        }
+                        className={selectClass}
+                        disabled={loadingCatalogs || !draft.categoryId}
+                      >
+                        <option value="">Sin subcategoria</option>
+                        {availableSubcategories.map((subcategory) => (
+                          <option key={subcategory.id} value={subcategory.id}>
+                            {subcategory.name}
+                          </option>
+                        ))}
+                      </select>
+                    </SelectWrap>
+                  </Field>
+                  <Field label="Marca" required error={draftErrors.brandId}>
+                    <SelectWrap>
+                      <select
+                        value={draft.brandId}
+                        onChange={(event) => handleBrandChange(event.target.value)}
+                        className={selectClass}
+                        disabled={loadingCatalogs}
+                      >
+                        <option value="">Selecciona marca</option>
+                        {catalogs.brands.map((brand) => (
+                          <option key={brand.id} value={brand.id}>
+                            {brand.name}
+                          </option>
+                        ))}
+                      </select>
+                    </SelectWrap>
+                  </Field>
+                  <Field
+                    label="Proveedor principal"
+                    required
+                    error={draftErrors.supplierId}
+                  >
+                    <SelectWrap>
+                      <select
+                        value={draft.supplierId}
+                        onChange={(event) =>
+                          handleSupplierChange(event.target.value)
+                        }
+                        className={selectClass}
+                        disabled={loadingCatalogs}
+                      >
+                        <option value="">Selecciona proveedor</option>
+                        {catalogs.suppliers.map((supplier) => (
+                          <option key={supplier.id} value={supplier.id}>
+                            {supplier.name}
+                          </option>
+                        ))}
+                      </select>
+                    </SelectWrap>
+                  </Field>
+                  <Field label="Estado">
+                    <SelectWrap>
+                      <select
+                        value={draft.status}
+                        onChange={(event) =>
+                          updateDraft(
+                            'status',
+                            normalizeStatus(event.target.value),
+                          )
+                        }
+                        className={selectClass}
+                      >
+                        <option>Activo</option>
+                        <option>Inactivo</option>
+                      </select>
+                    </SelectWrap>
+                  </Field>
+                  <Field label="Imagen URL">
+                    <input
+                      value={draft.imageUrl}
+                      onChange={(event) =>
+                        updateDraft('imageUrl', event.target.value)
+                      }
+                      className={inputClass}
+                      placeholder="/storage/productos/alternador.png"
+                    />
+                  </Field>
+                  <div className="md:col-span-2 xl:col-span-3">
+                    <Field label="Descripcion">
+                      <textarea
+                        value={draft.description}
+                        onChange={(event) =>
+                          updateDraft('description', event.target.value)
+                        }
+                        className={textareaClass}
+                        placeholder="Repuestos para Toyota y Hino"
+                      />
+                    </Field>
+                  </div>
+                  <div className="md:col-span-2 xl:col-span-3">
+                    <div className="flex min-h-32 items-center justify-center rounded-lg border border-dashed border-stroke bg-gray-50 p-4 dark:border-strokedark dark:bg-meta-4">
+                      {draft.imageUrl ? (
+                        <img
+                          src={draft.imageUrl}
+                          alt={draft.name || 'Producto'}
+                          className="max-h-40 w-full object-contain"
+                        />
+                      ) : (
+                        <FiImage className="h-10 w-10 text-slate-400" />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </FormCard>
+
+              <FormCard title="Unidades">
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+                  <Field
+                    label="Unidad de compra"
+                    required
+                    error={draftErrors.purchaseUnitId}
+                  >
+                    <SelectWrap>
+                      <select
+                        value={draft.purchaseUnitId}
+                        onChange={(event) =>
+                          handlePurchaseUnitChange(event.target.value)
+                        }
+                        className={selectClass}
+                        disabled={loadingCatalogs}
+                      >
+                        <option value="">Selecciona unidad</option>
+                        {catalogs.units.map((unit) => (
+                          <option key={unit.id} value={unit.id}>
+                            {unit.short_name
+                              ? `${unit.short_name} - ${unit.name}`
+                              : unit.name}
+                          </option>
+                        ))}
+                      </select>
+                    </SelectWrap>
+                  </Field>
+                  <Field
+                    label="Unidad de venta"
+                    required
+                    error={draftErrors.saleUnitId}
+                  >
+                    <SelectWrap>
+                      <select
+                        value={draft.saleUnitId}
+                        onChange={(event) =>
+                          handleSaleUnitChange(event.target.value)
+                        }
+                        className={selectClass}
+                        disabled={loadingCatalogs}
+                      >
+                        <option value="">Selecciona unidad</option>
+                        {catalogs.units.map((unit) => (
+                          <option key={unit.id} value={unit.id}>
+                            {unit.short_name
+                              ? `${unit.short_name} - ${unit.name}`
+                              : unit.name}
+                          </option>
+                        ))}
+                      </select>
+                    </SelectWrap>
+                  </Field>
+                  <Field
+                    label="Factor de conversion"
+                    required
+                    error={draftErrors.conversionFactor}
+                  >
+                    <input
+                      type="number"
+                      min="0.000001"
+                      step="0.000001"
+                      value={draft.conversionFactor}
+                      onChange={(event) =>
+                        updateDraft('conversionFactor', event.target.value)
+                      }
+                      className={inputClass}
+                    />
+                  </Field>
+                </div>
+                <p className="mt-4 rounded-lg bg-[#E8F0FF] px-4 py-3 text-sm font-bold text-primary">
+                  1 {draft.purchaseUnit || 'unidad de compra'} ={' '}
+                  {formatQuantity(parseNumber(draft.conversionFactor))}{' '}
+                  {draft.saleUnit || 'unidad de venta'}
+                </p>
+              </FormCard>
+
+              <FormCard title="Precios">
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+                  <Field label="Costo de compra" required error={draftErrors.cost}>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={draft.cost}
+                      onChange={(event) => updateDraft('cost', event.target.value)}
+                      className={inputClass}
+                      placeholder="200"
+                    />
+                  </Field>
+                  <Field
+                    label="Precio sin impuestos"
+                    required
+                    error={draftErrors.salePrice}
+                  >
+                    <input
+                      type="number"
+                      min={draft.allowSale ? '0.01' : '0'}
+                      step="0.01"
+                      value={draft.salePrice}
+                      onChange={(event) =>
+                        updateDraft('salePrice', event.target.value)
+                      }
+                      className={inputClass}
+                      placeholder="200"
+                    />
+                  </Field>
+                  <Field label="Tipo de impuesto">
+                    <SelectWrap>
+                      <select
+                        value={draft.taxType}
+                        onChange={(event) => {
+                          const nextTaxType = normalizeTaxType(event.target.value);
+                          setDraft((currentDraft) => ({
+                            ...currentDraft,
+                            taxType: nextTaxType,
+                            taxPercentage:
+                              nextTaxType === 'EXEMPT'
+                                ? '0'
+                                : currentDraft.taxPercentage,
+                          }));
+                        }}
+                        className={selectClass}
+                      >
+                        <option value="EXEMPT">Exento</option>
+                        <option value="TAXABLE">Gravado</option>
+                      </select>
+                    </SelectWrap>
+                  </Field>
+                  {draft.taxType === 'TAXABLE' && (
+                    <Field
+                      label="Porcentaje impuesto"
+                      required
+                      error={draftErrors.taxPercentage}
+                    >
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        value={draft.taxPercentage}
+                        onChange={(event) =>
+                          updateDraft('taxPercentage', event.target.value)
+                        }
+                        className={inputClass}
+                        placeholder="15"
+                      />
+                    </Field>
+                  )}
+                </div>
+                <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
+                  {[
+                    ['Precio Base', formatCurrency(previewSalePrice)],
+                    ['IVA', formatCurrency(previewTaxAmount)],
+                    ['Precio Final', formatCurrency(previewFinalPrice)],
+                  ].map(([label, value]) => (
+                    <div
+                      key={label}
+                      className="rounded-lg border border-stroke px-4 py-3 dark:border-strokedark"
+                    >
+                      <p className="text-xs font-bold uppercase text-slate-500">
+                        {label}
+                      </p>
+                      <p className="mt-2 text-base font-black text-black dark:text-white">
+                        {value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </FormCard>
+
+              <FormCard title="Inventario">
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+                  <Field label="Sucursal">
+                    <SelectWrap>
+                      <select
+                        value={draft.branchId}
+                        onChange={(event) => handleBranchChange(event.target.value)}
+                        className={selectClass}
+                        disabled={loadingCatalogs}
+                      >
+                        <option value="">Sin sucursal</option>
+                        {catalogs.branches.map((branch) => (
+                          <option key={branch.id} value={branch.id}>
+                            {branch.name}
+                          </option>
+                        ))}
+                      </select>
+                    </SelectWrap>
+                  </Field>
+                  <Field
+                    label="Almacen inicial"
+                    required
+                    error={draftErrors.warehouseId}
+                  >
+                    <SelectWrap>
+                      <select
+                        value={draft.warehouseId}
+                        onChange={(event) =>
+                          handleWarehouseChange(event.target.value)
+                        }
+                        className={selectClass}
+                        disabled={loadingCatalogs}
+                      >
+                        <option value="">Selecciona almacen</option>
+                        {availableWarehouses.map((warehouse) => (
+                          <option key={warehouse.id} value={warehouse.id}>
+                            {warehouse.name}
+                          </option>
+                        ))}
+                      </select>
+                    </SelectWrap>
+                  </Field>
+                  <Field label="Estado inventario">
+                    <SelectWrap>
+                      <select
+                        value={draft.inventoryStatus}
+                        onChange={(event) =>
+                          updateDraft(
+                            'inventoryStatus',
+                            event.target.value as InventoryStatus,
+                          )
+                        }
+                        className={selectClass}
+                      >
+                        <option value="RECEIVED">Recibido</option>
+                        <option value="PENDING_RECEIPT">
+                          Pendiente por recibir
+                        </option>
+                        <option value="IN_TRANSIT">En transito</option>
+                        <option value="RESERVED">Reservado</option>
+                      </select>
+                    </SelectWrap>
+                  </Field>
+                  <Field
+                    label={dialogMode === 'edit' ? 'Stock actual' : 'Stock inicial'}
+                    error={draftErrors.stock}
+                  >
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={draft.stock}
+                      onChange={(event) => updateDraft('stock', event.target.value)}
+                      className={inputClass}
+                    />
+                  </Field>
+                  <Field
+                    label="Alerta existencia minima"
+                    required
+                    error={draftErrors.minStock}
+                  >
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={draft.minStock}
+                      onChange={(event) =>
+                        updateDraft('minStock', event.target.value)
+                      }
+                      className={inputClass}
+                    />
+                  </Field>
+                  <Field
+                    label="Alerta existencia maxima"
+                    error={draftErrors.maxStock}
+                  >
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={draft.maxStock}
+                      onChange={(event) =>
+                        updateDraft('maxStock', event.target.value)
+                      }
+                      className={inputClass}
+                    />
+                  </Field>
+                  <ToggleField
+                    label="Permitir stock negativo"
+                    checked={draft.allowNegativeStock}
+                    onChange={(checked) =>
+                      updateDraft('allowNegativeStock', checked)
                     }
-                    className={selectClass}
-                    disabled={loadingCatalogs || !draft.categoryId}
-                  >
-                    <option value="">Sin subcategoria</option>
-                    {availableSubcategories.map((subcategory) => (
-                      <option key={subcategory.id} value={subcategory.id}>
-                        {subcategory.name}
-                      </option>
-                    ))}
-                  </select>
-                </SelectWrap>
-              </Field>
-              <Field label="Marca">
-                <SelectWrap>
-                  <select
-                    value={draft.brandId}
-                    onChange={(event) => handleBrandChange(event.target.value)}
-                    className={selectClass}
-                    disabled={loadingCatalogs}
-                  >
-                    <option value="">Generica</option>
-                    {catalogs.brands.map((brand) => (
-                      <option key={brand.id} value={brand.id}>
-                        {brand.name}
-                      </option>
-                    ))}
-                  </select>
-                </SelectWrap>
-              </Field>
-              <Field label="Unidad">
-                <SelectWrap>
-                  <select
-                    value={draft.unitId}
-                    onChange={(event) => handleUnitChange(event.target.value)}
-                    className={selectClass}
-                    disabled={loadingCatalogs}
-                  >
-                    <option value="">UND</option>
-                    {catalogs.units.map((unit) => (
-                      <option key={unit.id} value={unit.id}>
-                        {unit.short_name
-                          ? `${unit.short_name} - ${unit.name}`
-                          : unit.name}
-                      </option>
-                    ))}
-                  </select>
-                </SelectWrap>
-              </Field>
-              <Field label="Imagen URL">
-                <input
-                  value={draft.imageUrl}
-                  onChange={(event) => updateDraft('imageUrl', event.target.value)}
-                  className={inputClass}
-                  placeholder="/storage/productos/alternador.png"
-                />
-              </Field>
-              <Field label="Precio venta">
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={draft.salePrice}
-                  onChange={(event) =>
-                    updateDraft('salePrice', event.target.value)
-                  }
-                  className={inputClass}
-                  placeholder="5000"
-                />
-              </Field>
-              <Field label="Costo">
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={draft.cost}
-                  onChange={(event) => updateDraft('cost', event.target.value)}
-                  className={inputClass}
-                  placeholder="4000"
-                />
-              </Field>
-              <Field label="Stock">
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={draft.stock}
-                  onChange={(event) => updateDraft('stock', event.target.value)}
-                  className={inputClass}
-                />
-              </Field>
-              <Field label="Stock minimo">
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={draft.minStock}
-                  onChange={(event) =>
-                    updateDraft('minStock', event.target.value)
-                  }
-                  className={inputClass}
-                />
-              </Field>
-              <Field label="Estado">
-                <SelectWrap>
-                  <select
-                    value={draft.status}
-                    onChange={(event) =>
-                      updateDraft('status', normalizeStatus(event.target.value))
+                  />
+                  <ToggleField
+                    label="Maneja lotes"
+                    checked={draft.managesLots}
+                    onChange={(checked) => updateDraft('managesLots', checked)}
+                  />
+                  <ToggleField
+                    label="Maneja vencimiento"
+                    checked={draft.managesExpiration}
+                    onChange={(checked) =>
+                      updateDraft('managesExpiration', checked)
                     }
-                    className={selectClass}
-                  >
-                    <option>Activo</option>
-                    <option>Inactivo</option>
-                  </select>
-                </SelectWrap>
-              </Field>
-              <Field label="Descripcion">
-                <input
-                  value={draft.description}
-                  onChange={(event) =>
-                    updateDraft('description', event.target.value)
-                  }
-                  className={inputClass}
-                  placeholder="Repuestos para Toyota y para Hino"
-                />
-              </Field>
+                  />
+                  {draft.managesLots && (
+                    <Field label="Numero de lote" required error={draftErrors.lotNumber}>
+                      <input
+                        value={draft.lotNumber}
+                        onChange={(event) =>
+                          updateDraft('lotNumber', event.target.value)
+                        }
+                        className={inputClass}
+                      />
+                    </Field>
+                  )}
+                  {draft.managesExpiration && (
+                    <Field
+                      label="Fecha de vencimiento"
+                      required
+                      error={draftErrors.expirationDate}
+                    >
+                      <input
+                        type="date"
+                        value={draft.expirationDate}
+                        onChange={(event) =>
+                          updateDraft('expirationDate', event.target.value)
+                        }
+                        className={inputClass}
+                      />
+                    </Field>
+                  )}
+                </div>
+              </FormCard>
+
+              <FormCard title="Ubicacion">
+                <Field label="Ubicacion fisica">
+                  <input
+                    value={draft.physicalLocation}
+                    onChange={(event) =>
+                      updateDraft('physicalLocation', event.target.value)
+                    }
+                    className={inputClass}
+                    placeholder="Pasillo A, Estante 4, Nivel 2"
+                  />
+                </Field>
+              </FormCard>
+
+              <FormCard title="Configuraciones">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <ToggleField
+                    label="Producto inventariable"
+                    checked={draft.isInventory}
+                    onChange={(checked) =>
+                      setDraft((currentDraft) => ({
+                        ...currentDraft,
+                        isInventory: checked,
+                        isService: checked ? false : currentDraft.isService,
+                      }))
+                    }
+                  />
+                  <ToggleField
+                    label="Servicio"
+                    checked={draft.isService}
+                    onChange={(checked) =>
+                      setDraft((currentDraft) => ({
+                        ...currentDraft,
+                        isService: checked,
+                        isInventory: checked ? false : currentDraft.isInventory,
+                      }))
+                    }
+                  />
+                  <ToggleField
+                    label="Combo / Kit"
+                    checked={draft.isKit}
+                    onChange={(checked) => updateDraft('isKit', checked)}
+                  />
+                  <ToggleField
+                    label="Permitir venta"
+                    checked={draft.allowSale}
+                    onChange={(checked) => updateDraft('allowSale', checked)}
+                  />
+                  <ToggleField
+                    label="Permitir compra"
+                    checked={draft.allowPurchase}
+                    onChange={(checked) => updateDraft('allowPurchase', checked)}
+                  />
+                  <ToggleField
+                    label="Producto favorito"
+                    checked={draft.isFavorite}
+                    onChange={(checked) => updateDraft('isFavorite', checked)}
+                  />
+                  {draftErrors.isService && (
+                    <p className="text-sm font-semibold text-red-500 md:col-span-2 xl:col-span-3">
+                      {draftErrors.isService}
+                    </p>
+                  )}
+                </div>
+              </FormCard>
+
+              <FormCard title="Observaciones">
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                  <Field label="Notas">
+                    <textarea
+                      value={draft.notes}
+                      onChange={(event) => updateDraft('notes', event.target.value)}
+                      className={textareaClass}
+                    />
+                  </Field>
+                  <Field label="Observaciones">
+                    <textarea
+                      value={draft.observations}
+                      onChange={(event) =>
+                        updateDraft('observations', event.target.value)
+                      }
+                      className={textareaClass}
+                    />
+                  </Field>
+                </div>
+              </FormCard>
             </div>
 
             <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
@@ -1856,9 +2769,20 @@ const Products = () => {
               >
                 Cancelar
               </button>
+              {dialogMode === 'create' && (
+                <button
+                  type="button"
+                  disabled={submitting || Object.keys(draftErrors).length > 0}
+                  onClick={() => void saveProduct(true)}
+                  className="inline-flex h-12 items-center justify-center gap-3 rounded-lg border border-primary px-6 text-sm font-bold text-primary transition hover:bg-primary hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <FiPlus className="h-5 w-5" />
+                  Guardar y crear otro
+                </button>
+              )}
               <button
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || Object.keys(draftErrors).length > 0}
                 className="inline-flex h-12 items-center justify-center gap-3 rounded-lg bg-primary px-6 text-sm font-bold text-white transition hover:bg-opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <FiSave className="h-5 w-5" />

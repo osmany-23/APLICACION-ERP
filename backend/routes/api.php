@@ -46,5 +46,5 @@ Route::middleware('erp.auth')->group(function () {
     Route::get('/products/{product}/movements', [ProductController::class, 'movements'])
         ->whereNumber('product');
     Route::apiResource('products', ProductController::class)
-        ->only(['index', 'store', 'update', 'destroy']);
+        ->only(['index', 'show', 'store', 'update', 'destroy']);
 });
