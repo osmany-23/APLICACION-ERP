@@ -32,6 +32,8 @@ type CatalogItem = {
   margin_percent?: number | string | null;
   products_count?: number | string | null;
   subcategories_count?: number | string | null;
+  image_url?: string | null;
+  description?: string | null;
 };
 
 type CatalogResponse = {
@@ -53,6 +55,8 @@ type CatalogDraft = {
   shortName: string;
   parentId: string;
   marginPercent: string;
+  imageUrl: string;
+  description: string;
 };
 
 type CatalogConfig = {
@@ -101,6 +105,8 @@ const emptyDraft: CatalogDraft = {
   shortName: '',
   parentId: '',
   marginPercent: '0',
+  imageUrl: '',
+  description: '',
 };
 
 const inputClass =
@@ -144,6 +150,7 @@ function mapItem(item: CatalogItem): CatalogItem {
     products_count: readNumber(item.products_count),
     subcategories_count: readNumber(item.subcategories_count),
     parent_id: item.parent_id ? Number(item.parent_id) : null,
+    description: item.description || '',
   };
 }
 
@@ -241,7 +248,7 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
   );
   const tableColumns =
     catalog === 'brands'
-      ? 3
+      ? 5
       : catalog === 'units'
         ? 4
         : 5;
@@ -254,7 +261,10 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
   }
 
   function openCreateDialog() {
-    setDraft(emptyDraft);
+    setDraft({
+      ...emptyDraft,
+      imageUrl: '',
+    });
     setEditingItem(null);
     setFormError('');
     setDialogOpen(true);
@@ -266,6 +276,8 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
       shortName: item.short_name || '',
       parentId: item.parent_id ? String(item.parent_id) : '',
       marginPercent: String(readNumber(item.margin_percent)),
+      imageUrl: catalog === 'brands' ? String(item.image_url || '') : '',
+      description: catalog === 'brands' ? String(item.description || '') : '',
     });
     setEditingItem(item);
     setFormError('');
@@ -283,6 +295,11 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
     const payload: Record<string, string | number> = {
       name: draft.name.trim(),
     };
+
+    if (catalog === 'brands') {
+      payload.image_url = draft.imageUrl.trim();
+      payload.description = draft.description.trim();
+    }
 
     if (config.hasShortName) {
       payload.short_name = draft.shortName.trim().toUpperCase();
@@ -492,9 +509,19 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
                     Categoria
                   </th>
                 )}
+                {catalog === 'brands' && (
+                  <th className="px-4 py-4 text-xs font-black uppercase text-black dark:text-white">
+                    Imagen
+                  </th>
+                )}
                 <th className="px-4 py-4 text-xs font-black uppercase text-black dark:text-white">
                   Nombre
                 </th>
+                {catalog === 'brands' && (
+                  <th className="px-4 py-4 text-xs font-black uppercase text-black dark:text-white">
+                    Descripción
+                  </th>
+                )}
                 {config.hasShortName && (
                   <th className="px-4 py-4 text-xs font-black uppercase text-black dark:text-white">
                     Abreviatura
@@ -541,11 +568,35 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
                         {item.parent_name || 'Sin categoria'}
                       </td>
                     )}
+                    {catalog === 'brands' && (
+                      <td className="px-4 py-5">
+                        {item.image_url ? (
+                          <img
+                            src={item.image_url}
+                            alt={item.name}
+                            className="h-12 w-12 rounded object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-12 w-12 items-center justify-center rounded bg-slate-100 text-sm text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                            IMG
+                          </div>
+                        )}
+                      </td>
+                    )}
                     <td className="px-4 py-5">
                       <p className="text-base font-black text-black dark:text-white">
                         {item.name}
                       </p>
                     </td>
+                    {catalog === 'brands' && (
+                      <td className="px-4 py-5 text-sm text-slate-500 dark:text-slate-300">
+                        {item.description
+                          ? item.description.length > 80
+                            ? `${item.description.slice(0, 80).trim()}...`
+                            : item.description
+                          : '—'}
+                      </td>
+                    )}
                     {config.hasShortName && (
                       <td className="px-4 py-5 text-sm font-black uppercase text-primary">
                         {item.short_name}
@@ -658,6 +709,30 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
                   placeholder={config.title}
                 />
               </Field>
+
+              {catalog === 'brands' && (
+                <Field label="URL de imagen">
+                  <input
+                    value={draft.imageUrl}
+                    onChange={(event) => updateDraft('imageUrl', event.target.value)}
+                    className={inputClass}
+                    placeholder="https://example.com/logo.png"
+                  />
+                </Field>
+              )}
+
+              {catalog === 'brands' && (
+                <div className="sm:col-span-2">
+                  <Field label="Descripción">
+                    <textarea
+                      value={draft.description}
+                      onChange={(event) => updateDraft('description', event.target.value)}
+                      className={`${inputClass} min-h-[112px] resize-none py-3`}
+                      placeholder="Describe brevemente la marca"
+                    />
+                  </Field>
+                </div>
+              )}
 
               {config.hasShortName && (
                 <Field label="Abreviatura">

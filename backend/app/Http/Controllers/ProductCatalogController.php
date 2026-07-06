@@ -98,7 +98,7 @@ class ProductCatalogController extends Controller
     {
         return DB::table('brands')
             ->where('brands.company_id', $companyId)
-            ->select(['brands.id', 'brands.name'])
+            ->select(['brands.id', 'brands.name', 'brands.description', 'brands.image_url'])
             ->selectSub(function ($query) use ($companyId) {
                 $query->from('products')
                     ->selectRaw('COUNT(*)')
@@ -110,6 +110,8 @@ class ProductCatalogController extends Controller
             ->map(fn ($brand) => [
                 'id' => (int) $brand->id,
                 'name' => (string) $brand->name,
+                'description' => (string) ($brand->description ?? ''),
+                'image_url' => (string) ($brand->image_url ?? ''),
                 'products_count' => (int) $brand->products_count,
             ])
             ->values();
@@ -208,10 +210,15 @@ class ProductCatalogController extends Controller
     {
         $validated = $this->brandValidation($request, $companyId);
 
-        return DB::table('brands')->insertGetId([
-            'company_id' => $companyId,
-            'name' => $this->cleanName($validated['name']),
-        ]);
+        return DB::transaction(function () use ($companyId, $validated) {
+            return DB::table('brands')->insertGetId([
+                'company_id' => $companyId,
+                'code' => $this->generateBrandCode($companyId),
+                'name' => $this->cleanName($validated['name']),
+                'description' => $this->nullableText($validated['description'] ?? null),
+                'image_url' => $this->nullableText($validated['image_url'] ?? null),
+            ]);
+        });
     }
 
     private function updateBrand(Request $request, int $companyId, int $id): void
@@ -221,7 +228,11 @@ class ProductCatalogController extends Controller
         DB::table('brands')
             ->where('id', $id)
             ->where('company_id', $companyId)
-            ->update(['name' => $this->cleanName($validated['name'])]);
+            ->update([
+                'name' => $this->cleanName($validated['name']),
+                'description' => $this->nullableText($validated['description'] ?? null),
+                'image_url' => $this->nullableText($validated['image_url'] ?? null),
+            ]);
     }
 
     private function storeCategory(Request $request, int $companyId): int
@@ -314,7 +325,37 @@ class ProductCatalogController extends Controller
                     ->where(fn ($query) => $query->where('company_id', $companyId))
                     ->ignore($id),
             ],
+            'description' => ['nullable', 'string', 'max:500'],
+            'image_url' => ['nullable', 'string', 'max:255'],
         ], $this->messages());
+    }
+
+    private function generateBrandCode(int $companyId): string
+    {
+        $latestCode = DB::table('brands')
+            ->where('company_id', $companyId)
+            ->where('code', 'like', 'BR%')
+            ->orderByDesc('code')
+            ->lockForUpdate()
+            ->value('code');
+
+        if (!$latestCode) {
+            return 'BR000001';
+        }
+
+        $numeric = (int) preg_replace('/^BR0*/', '', $latestCode);
+        $next = $numeric > 0 ? $numeric + 1 : 1;
+
+        do {
+            $candidate = sprintf('BR%06d', $next);
+            $exists = DB::table('brands')
+                ->where('company_id', $companyId)
+                ->where('code', $candidate)
+                ->exists();
+            $next += 1;
+        } while ($exists);
+
+        return $candidate;
     }
 
     private function categoryValidation(Request $request, int $companyId, ?int $id = null): array
@@ -494,5 +535,12 @@ class ProductCatalogController extends Controller
             'short_name.required' => 'Ingresa la abreviatura.',
             'short_name.unique' => 'Ya existe una unidad con esa abreviatura.',
         ];
+    }
+
+    private function nullableText(mixed $value): ?string
+    {
+        $value = trim((string) $value);
+
+        return $value === '' ? null : $value;
     }
 }
