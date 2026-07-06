@@ -11,25 +11,17 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (Schema::hasTable('user_api_tokens')) {
-            return;
-        }
-
         Schema::create('user_api_tokens', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('user_id');
-            $table->string('name', 100)->nullable();
+            // Asegúrate de que coincida con el tipo de dato de 'id' en tu tabla 'users'
+            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
+            $table->string('name');
             $table->string('token_hash', 64)->unique();
-            $table->json('abilities')->nullable();
-            $table->string('ip_address', 80)->nullable();
+            $table->text('abilities')->nullable(); // Guardará el ["*"]
+            $table->string('ip_address', 45)->nullable();
             $table->text('user_agent')->nullable();
-            $table->timestamp('last_used_at')->nullable();
             $table->timestamp('expires_at')->nullable();
-            $table->timestamp('revoked_at')->nullable();
-            $table->timestamp('created_at')->useCurrent();
-
-            $table->foreign('user_id')->references('id')->on('users');
-            $table->index(['user_id', 'expires_at']);
+            $table->timestamps();
         });
     }
 

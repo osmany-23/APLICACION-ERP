@@ -2,38 +2,19 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Database\Factories\UserFactory;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use Notifiable;
 
-    public const UPDATED_AT = null;
+    protected $table = 'users';
 
-    /**
-     * The column name of the password field used during authentication.
-     *
-     * @var string
-     */
-    protected $authPasswordName = 'password_hash';
+    protected $primaryKey = 'id';
 
-    /**
-     * Remember tokens are not part of the imported ERP schema.
-     *
-     * @var string
-     */
-    protected $rememberTokenName = '';
+    public $timestamps = true;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
     protected $fillable = [
         'company_id',
         'branch_id',
@@ -48,26 +29,20 @@ class User extends Authenticatable
         'last_login',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
     protected $hidden = [
         'password_hash',
     ];
 
+    protected $casts = [
+        'status' => 'integer',
+        'last_login' => 'datetime',
+    ];
+
     /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
+     * Devuelve la contraseña para que Laravel pueda autenticar al usuario.
      */
-    protected function casts(): array
+    public function getAuthPassword()
     {
-        return [
-            'last_login' => 'datetime',
-            'created_at' => 'datetime',
-            'password_hash' => 'hashed',
-        ];
+        return $this->password_hash;
     }
 }
