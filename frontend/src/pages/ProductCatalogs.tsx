@@ -25,7 +25,9 @@ type CatalogType = 'brands' | 'categories' | 'subcategories' | 'units';
 
 type CatalogItem = {
   id: number;
+  code?: string | null;
   name: string;
+  is_active?: boolean | null;
   short_name?: string | null;
   parent_id?: number | null;
   parent_name?: string | null;
@@ -34,6 +36,9 @@ type CatalogItem = {
   subcategories_count?: number | string | null;
   image_url?: string | null;
   description?: string | null;
+  level?: number | string | null;
+  category?: string | null;
+  decimal_places?: number | string | null;
 };
 
 type CatalogResponse = {
@@ -57,6 +62,10 @@ type CatalogDraft = {
   marginPercent: string;
   imageUrl: string;
   description: string;
+  level: string;
+  category: string;
+  decimalPlaces: string;
+  isActive: boolean;
 };
 
 type CatalogConfig = {
@@ -67,6 +76,11 @@ type CatalogConfig = {
   hasMargin?: boolean;
   hasParent?: boolean;
   hasShortName?: boolean;
+  hasDescription?: boolean;
+  hasImage?: boolean;
+  hasLevel?: boolean;
+  hasCategory?: boolean;
+  hasDecimalPlaces?: boolean;
 };
 
 const configs: Record<CatalogType, CatalogConfig> = {
@@ -75,6 +89,8 @@ const configs: Record<CatalogType, CatalogConfig> = {
     singular: 'marca',
     newLabel: 'Nueva marca',
     searchPlaceholder: 'Buscar marcas...',
+    hasDescription: true,
+    hasImage: true,
   },
   categories: {
     title: 'Categorias',
@@ -82,6 +98,9 @@ const configs: Record<CatalogType, CatalogConfig> = {
     newLabel: 'Nueva categoria',
     searchPlaceholder: 'Buscar categorias...',
     hasMargin: true,
+    hasDescription: true,
+    hasImage: true,
+    hasLevel: true,
   },
   subcategories: {
     title: 'Subcategorias',
@@ -90,6 +109,9 @@ const configs: Record<CatalogType, CatalogConfig> = {
     searchPlaceholder: 'Buscar subcategorias...',
     hasMargin: true,
     hasParent: true,
+    hasDescription: true,
+    hasImage: true,
+    hasLevel: true,
   },
   units: {
     title: 'Unidades de medida',
@@ -97,6 +119,8 @@ const configs: Record<CatalogType, CatalogConfig> = {
     newLabel: 'Nueva unidad',
     searchPlaceholder: 'Buscar unidades...',
     hasShortName: true,
+    hasCategory: true,
+    hasDecimalPlaces: true,
   },
 };
 
@@ -107,6 +131,10 @@ const emptyDraft: CatalogDraft = {
   marginPercent: '0',
   imageUrl: '',
   description: '',
+  level: '1',
+  category: 'UNIDAD',
+  decimalPlaces: '0',
+  isActive: true,
 };
 
 const inputClass =
@@ -151,6 +179,10 @@ function mapItem(item: CatalogItem): CatalogItem {
     subcategories_count: readNumber(item.subcategories_count),
     parent_id: item.parent_id ? Number(item.parent_id) : null,
     description: item.description || '',
+    level: readNumber(item.level),
+    category: item.category || 'UNIDAD',
+    decimal_places: readNumber(item.decimal_places),
+    is_active: Boolean(item.is_active ?? true),
   };
 }
 
@@ -233,7 +265,14 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
     }
 
     return items.filter((item) =>
-      [item.name, item.short_name || '', item.parent_name || '']
+      [
+        item.name,
+        item.short_name || '',
+        item.parent_name || '',
+        item.description || '',
+        item.category || '',
+        String(item.level || ''),
+      ]
         .map(normalizeText)
         .some((value) => value.includes(search)),
     );
@@ -248,12 +287,12 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
   );
   const tableColumns =
     catalog === 'brands'
-      ? 5
+      ? 6
       : catalog === 'units'
-        ? 4
-        : 5;
+        ? 6
+        : 7;
 
-  function updateDraft(field: keyof CatalogDraft, value: string) {
+  function updateDraft(field: keyof CatalogDraft, value: string | boolean) {
     setDraft((currentDraft) => ({
       ...currentDraft,
       [field]: value,
@@ -264,6 +303,7 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
     setDraft({
       ...emptyDraft,
       imageUrl: '',
+      isActive: true,
     });
     setEditingItem(null);
     setFormError('');
@@ -276,8 +316,16 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
       shortName: item.short_name || '',
       parentId: item.parent_id ? String(item.parent_id) : '',
       marginPercent: String(readNumber(item.margin_percent)),
-      imageUrl: catalog === 'brands' ? String(item.image_url || '') : '',
-      description: catalog === 'brands' ? String(item.description || '') : '',
+      imageUrl: catalog === 'brands' || catalog === 'categories' || catalog === 'subcategories'
+        ? String(item.image_url || '')
+        : '',
+      description: catalog === 'brands' || catalog === 'categories' || catalog === 'subcategories'
+        ? String(item.description || '')
+        : '',
+      level: String(readNumber(item.level || 1)),
+      category: String(item.category || 'UNIDAD'),
+      decimalPlaces: String(readNumber(item.decimal_places || 0)),
+      isActive: Boolean(item.is_active ?? true),
     });
     setEditingItem(item);
     setFormError('');
@@ -296,8 +344,11 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
       name: draft.name.trim(),
     };
 
-    if (catalog === 'brands') {
+    if (config.hasImage) {
       payload.image_url = draft.imageUrl.trim();
+    }
+
+    if (config.hasDescription) {
       payload.description = draft.description.trim();
     }
 
@@ -313,7 +364,80 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
       payload.margin_percent = Number(draft.marginPercent || 0);
     }
 
+    payload.is_active = draft.isActive;
+
+    if (config.hasLevel) {
+      payload.level = Number(draft.level || 1);
+    }
+
+    if (config.hasCategory) {
+      payload.category = draft.category.trim().toUpperCase();
+    }
+
+    if (config.hasDecimalPlaces) {
+      payload.decimal_places = Number(draft.decimalPlaces || 0);
+    }
+
     return payload;
+  }
+
+  async function handleStatusToggle(item: CatalogItem, nextValue: boolean) {
+    if (!token) {
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const payload: Record<string, string | number | boolean> = {
+        name: item.name,
+        is_active: nextValue,
+      };
+
+      if (catalog === 'brands' || catalog === 'categories' || catalog === 'subcategories') {
+        payload.description = item.description || '';
+        payload.image_url = item.image_url || '';
+      }
+
+      if (config.hasShortName) {
+        payload.short_name = item.short_name || '';
+      }
+
+      if (config.hasParent) {
+        payload.parent_id = item.parent_id ?? 0;
+      }
+
+      if (config.hasMargin) {
+        payload.margin_percent = readNumber(item.margin_percent);
+      }
+
+      if (config.hasLevel) {
+        payload.level = readNumber(item.level || 1);
+      }
+
+      if (config.hasCategory) {
+        payload.category = item.category || 'UNIDAD';
+      }
+
+      if (config.hasDecimalPlaces) {
+        payload.decimal_places = readNumber(item.decimal_places || 0);
+      }
+
+      const response = await apiRequest<CatalogMutationResponse>(
+        `/catalogs/${catalog}/${item.id}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(payload),
+        },
+        token,
+      );
+
+      setNotice(response.message || 'Estado actualizado correctamente.');
+      await loadItems();
+    } catch (error) {
+      setPageError(getErrorMessage(error));
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -509,7 +633,7 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
                     Categoria
                   </th>
                 )}
-                {catalog === 'brands' && (
+                {(catalog === 'brands' || catalog === 'categories' || catalog === 'subcategories') && (
                   <th className="px-4 py-4 text-xs font-black uppercase text-black dark:text-white">
                     Imagen
                   </th>
@@ -517,7 +641,7 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
                 <th className="px-4 py-4 text-xs font-black uppercase text-black dark:text-white">
                   Nombre
                 </th>
-                {catalog === 'brands' && (
+                {(catalog === 'brands' || catalog === 'categories' || catalog === 'subcategories') && (
                   <th className="px-4 py-4 text-xs font-black uppercase text-black dark:text-white">
                     Descripción
                   </th>
@@ -525,6 +649,21 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
                 {config.hasShortName && (
                   <th className="px-4 py-4 text-xs font-black uppercase text-black dark:text-white">
                     Abreviatura
+                  </th>
+                )}
+                {config.hasCategory && (
+                  <th className="px-4 py-4 text-xs font-black uppercase text-black dark:text-white">
+                    Categoría
+                  </th>
+                )}
+                {config.hasLevel && (
+                  <th className="px-4 py-4 text-xs font-black uppercase text-black dark:text-white">
+                    Nivel
+                  </th>
+                )}
+                {config.hasDecimalPlaces && (
+                  <th className="px-4 py-4 text-xs font-black uppercase text-black dark:text-white">
+                    Decimales
                   </th>
                 )}
                 {config.hasMargin && (
@@ -537,6 +676,9 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
                     Subcategorias
                   </th>
                 )}
+                <th className="px-4 py-4 text-xs font-black uppercase text-black dark:text-white">
+                  Estado
+                </th>
                 <th className="px-4 py-4 text-xs font-black uppercase text-black dark:text-white">
                   Productos
                 </th>
@@ -568,7 +710,7 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
                         {item.parent_name || 'Sin categoria'}
                       </td>
                     )}
-                    {catalog === 'brands' && (
+                    {(catalog === 'brands' || catalog === 'categories' || catalog === 'subcategories') && (
                       <td className="px-4 py-5">
                         {item.image_url ? (
                           <img
@@ -588,7 +730,7 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
                         {item.name}
                       </p>
                     </td>
-                    {catalog === 'brands' && (
+                    {(catalog === 'brands' || catalog === 'categories' || catalog === 'subcategories') && (
                       <td className="px-4 py-5 text-sm text-slate-500 dark:text-slate-300">
                         {item.description
                           ? item.description.length > 80
@@ -602,6 +744,21 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
                         {item.short_name}
                       </td>
                     )}
+                    {config.hasCategory && (
+                      <td className="px-4 py-5 text-sm font-semibold text-black dark:text-white">
+                        {item.category || '—'}
+                      </td>
+                    )}
+                    {config.hasLevel && (
+                      <td className="px-4 py-5 text-sm font-semibold text-black dark:text-white">
+                        {readNumber(item.level)}
+                      </td>
+                    )}
+                    {config.hasDecimalPlaces && (
+                      <td className="px-4 py-5 text-sm font-semibold text-black dark:text-white">
+                        {readNumber(item.decimal_places)}
+                      </td>
+                    )}
                     {config.hasMargin && (
                       <td className="px-4 py-5 text-sm font-black text-[#0F9F37]">
                         {readNumber(item.margin_percent)}%
@@ -612,6 +769,19 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
                         {readNumber(item.subcategories_count)}
                       </td>
                     )}
+                    <td className="px-4 py-5">
+                      <label className="inline-flex cursor-pointer items-center">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(item.is_active ?? true)}
+                          onChange={() => void handleStatusToggle(item, !Boolean(item.is_active ?? true))}
+                          className="peer sr-only"
+                        />
+                        <span className="relative h-7 w-14 rounded-full bg-red-500 transition peer-checked:bg-green-500">
+                          <span className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white transition peer-checked:translate-x-7" />
+                        </span>
+                      </label>
+                    </td>
                     <td className="px-4 py-5 text-sm font-semibold text-black dark:text-white">
                       {readNumber(item.products_count)}
                     </td>
@@ -710,7 +880,7 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
                 />
               </Field>
 
-              {catalog === 'brands' && (
+              {(catalog === 'brands' || catalog === 'categories' || catalog === 'subcategories') && config.hasImage && (
                 <Field label="URL de imagen">
                   <input
                     value={draft.imageUrl}
@@ -721,14 +891,14 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
                 </Field>
               )}
 
-              {catalog === 'brands' && (
+              {(catalog === 'brands' || catalog === 'categories' || catalog === 'subcategories') && config.hasDescription && (
                 <div className="sm:col-span-2">
                   <Field label="Descripción">
                     <textarea
                       value={draft.description}
                       onChange={(event) => updateDraft('description', event.target.value)}
                       className={`${inputClass} min-h-[112px] resize-none py-3`}
-                      placeholder="Describe brevemente la marca"
+                      placeholder={catalog === 'brands' ? 'Describe brevemente la marca' : 'Describe brevemente la categoría'}
                     />
                   </Field>
                 </div>
@@ -757,6 +927,70 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
                     onChange={(event) =>
                       updateDraft('marginPercent', event.target.value)
                     }
+                    className={inputClass}
+                  />
+                </Field>
+              )}
+
+              <div className="sm:col-span-2">
+                <Field label="Estado">
+                  <div className="flex items-center gap-3">
+                    <label className="inline-flex cursor-pointer items-center">
+                      <input
+                        type="checkbox"
+                        checked={draft.isActive}
+                        onChange={() => updateDraft('isActive', !draft.isActive)}
+                        className="peer sr-only"
+                      />
+                      <span className="relative h-7 w-14 rounded-full bg-red-500 transition peer-checked:bg-green-500">
+                        <span className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white transition peer-checked:translate-x-7" />
+                      </span>
+                    </label>
+                    <span className="text-sm font-semibold text-black dark:text-white">
+                      {draft.isActive ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </div>
+                </Field>
+              </div>
+
+              {config.hasLevel && (
+                <Field label="Nivel">
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={draft.level}
+                    onChange={(event) => updateDraft('level', event.target.value)}
+                    className={inputClass}
+                  />
+                </Field>
+              )}
+
+              {config.hasCategory && (
+                <Field label="Categoría">
+                  <select
+                    value={draft.category}
+                    onChange={(event) => updateDraft('category', event.target.value)}
+                    className={selectClass}
+                  >
+                    <option value="UNIDAD">Unidad</option>
+                    <option value="PESO">Peso</option>
+                    <option value="VOLUMEN">Volumen</option>
+                    <option value="LONGITUD">Longitud</option>
+                    <option value="OTRO">Otro</option>
+                  </select>
+                </Field>
+              )}
+
+              {config.hasDecimalPlaces && (
+                <Field label="Decimales">
+                  <input
+                    type="number"
+                    min="0"
+                    max="6"
+                    step="1"
+                    value={draft.decimalPlaces}
+                    onChange={(event) => updateDraft('decimalPlaces', event.target.value)}
                     className={inputClass}
                   />
                 </Field>

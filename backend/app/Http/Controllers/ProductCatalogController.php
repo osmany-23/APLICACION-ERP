@@ -98,7 +98,7 @@ class ProductCatalogController extends Controller
     {
         return DB::table('brands')
             ->where('brands.company_id', $companyId)
-            ->select(['brands.id', 'brands.name', 'brands.description', 'brands.image_url'])
+            ->select(['brands.id', 'brands.name', 'brands.description', 'brands.image_url', 'brands.is_active'])
             ->selectSub(function ($query) use ($companyId) {
                 $query->from('products')
                     ->selectRaw('COUNT(*)')
@@ -112,6 +112,7 @@ class ProductCatalogController extends Controller
                 'name' => (string) $brand->name,
                 'description' => (string) ($brand->description ?? ''),
                 'image_url' => (string) ($brand->image_url ?? ''),
+                'is_active' => (bool) ($brand->is_active ?? true),
                 'products_count' => (int) $brand->products_count,
             ])
             ->values();
@@ -122,7 +123,16 @@ class ProductCatalogController extends Controller
         return DB::table('categories')
             ->where('categories.company_id', $companyId)
             ->whereNull('categories.parent_id')
-            ->select(['categories.id', 'categories.name', 'categories.margin_percent'])
+            ->select([
+                'categories.id',
+                'categories.code',
+                'categories.name',
+                'categories.description',
+                'categories.image_url',
+                'categories.level',
+                'categories.margin_percent',
+                'categories.is_active',
+            ])
             ->selectSub(function ($query) use ($companyId) {
                 $query->from('categories as children')
                     ->selectRaw('COUNT(*)')
@@ -139,8 +149,13 @@ class ProductCatalogController extends Controller
             ->get()
             ->map(fn ($category) => [
                 'id' => (int) $category->id,
+                'code' => (string) ($category->code ?? ''),
                 'name' => (string) $category->name,
+                'description' => (string) ($category->description ?? ''),
+                'image_url' => (string) ($category->image_url ?? ''),
+                'level' => (int) ($category->level ?? 1),
                 'margin_percent' => (float) ($category->margin_percent ?? 0),
+                'is_active' => (bool) ($category->is_active ?? true),
                 'products_count' => (int) $category->products_count,
                 'subcategories_count' => (int) $category->subcategories_count,
             ])
@@ -156,9 +171,14 @@ class ProductCatalogController extends Controller
             ->whereNotNull('subcategories.parent_id')
             ->select([
                 'subcategories.id',
+                'subcategories.code',
                 'subcategories.name',
+                'subcategories.description',
+                'subcategories.image_url',
+                'subcategories.level',
                 'subcategories.parent_id',
                 'subcategories.margin_percent',
+                'subcategories.is_active',
                 'parents.name as parent_name',
             ])
             ->selectSub(function ($query) use ($companyId) {
@@ -172,10 +192,15 @@ class ProductCatalogController extends Controller
             ->get()
             ->map(fn ($subcategory) => [
                 'id' => (int) $subcategory->id,
+                'code' => (string) ($subcategory->code ?? ''),
                 'name' => (string) $subcategory->name,
+                'description' => (string) ($subcategory->description ?? ''),
+                'image_url' => (string) ($subcategory->image_url ?? ''),
+                'level' => (int) ($subcategory->level ?? 1),
                 'parent_id' => (int) $subcategory->parent_id,
                 'parent_name' => (string) $subcategory->parent_name,
                 'margin_percent' => (float) ($subcategory->margin_percent ?? 0),
+                'is_active' => (bool) ($subcategory->is_active ?? true),
                 'products_count' => (int) $subcategory->products_count,
             ])
             ->values();
@@ -185,7 +210,15 @@ class ProductCatalogController extends Controller
     {
         return DB::table('units')
             ->where('units.company_id', $companyId)
-            ->select(['units.id', 'units.name', 'units.short_name'])
+            ->select([
+                'units.id',
+                'units.code',
+                'units.name',
+                'units.short_name',
+                'units.category',
+                'units.decimal_places',
+                'units.is_active',
+            ])
             ->selectSub(function ($query) use ($companyId) {
                 $query->from('products')
                     ->selectRaw('COUNT(*)')
@@ -199,8 +232,12 @@ class ProductCatalogController extends Controller
             ->get()
             ->map(fn ($unit) => [
                 'id' => (int) $unit->id,
+                'code' => (string) ($unit->code ?? ''),
                 'name' => (string) $unit->name,
                 'short_name' => (string) $unit->short_name,
+                'category' => (string) ($unit->category ?? 'UNIDAD'),
+                'decimal_places' => (int) ($unit->decimal_places ?? 0),
+                'is_active' => (bool) ($unit->is_active ?? true),
                 'products_count' => (int) $unit->products_count,
             ])
             ->values();
@@ -217,6 +254,7 @@ class ProductCatalogController extends Controller
                 'name' => $this->cleanName($validated['name']),
                 'description' => $this->nullableText($validated['description'] ?? null),
                 'image_url' => $this->nullableText($validated['image_url'] ?? null),
+                'is_active' => (bool) ($validated['is_active'] ?? true),
             ]);
         });
     }
@@ -232,6 +270,7 @@ class ProductCatalogController extends Controller
                 'name' => $this->cleanName($validated['name']),
                 'description' => $this->nullableText($validated['description'] ?? null),
                 'image_url' => $this->nullableText($validated['image_url'] ?? null),
+                'is_active' => (bool) ($validated['is_active'] ?? true),
             ]);
     }
 
@@ -242,9 +281,15 @@ class ProductCatalogController extends Controller
         return DB::table('categories')->insertGetId([
             'company_id' => $companyId,
             'parent_id' => null,
+            'code' => $this->generateCategoryCode($companyId),
             'name' => $this->cleanName($validated['name']),
+            'description' => $this->nullableText($validated['description'] ?? null),
+            'image_url' => $this->nullableText($validated['image_url'] ?? null),
+            'level' => $this->resolveCategoryLevel($companyId, null, $validated['level'] ?? null),
             'margin_percent' => (float) ($validated['margin_percent'] ?? 0),
+            'is_active' => (bool) ($validated['is_active'] ?? true),
             'created_at' => now(),
+            'updated_at' => now(),
         ]);
     }
 
@@ -258,7 +303,12 @@ class ProductCatalogController extends Controller
             ->whereNull('parent_id')
             ->update([
                 'name' => $this->cleanName($validated['name']),
+                'description' => $this->nullableText($validated['description'] ?? null),
+                'image_url' => $this->nullableText($validated['image_url'] ?? null),
+                'level' => $this->resolveCategoryLevel($companyId, null, $validated['level'] ?? null),
                 'margin_percent' => (float) ($validated['margin_percent'] ?? 0),
+                'is_active' => (bool) ($validated['is_active'] ?? true),
+                'updated_at' => now(),
             ]);
     }
 
@@ -269,9 +319,15 @@ class ProductCatalogController extends Controller
         return DB::table('categories')->insertGetId([
             'company_id' => $companyId,
             'parent_id' => (int) $validated['parent_id'],
+            'code' => $this->generateCategoryCode($companyId),
             'name' => $this->cleanName($validated['name']),
+            'description' => $this->nullableText($validated['description'] ?? null),
+            'image_url' => $this->nullableText($validated['image_url'] ?? null),
+            'level' => $this->resolveCategoryLevel($companyId, (int) $validated['parent_id'], $validated['level'] ?? null),
             'margin_percent' => (float) ($validated['margin_percent'] ?? 0),
+            'is_active' => (bool) ($validated['is_active'] ?? true),
             'created_at' => now(),
+            'updated_at' => now(),
         ]);
     }
 
@@ -286,7 +342,12 @@ class ProductCatalogController extends Controller
             ->update([
                 'parent_id' => (int) $validated['parent_id'],
                 'name' => $this->cleanName($validated['name']),
+                'description' => $this->nullableText($validated['description'] ?? null),
+                'image_url' => $this->nullableText($validated['image_url'] ?? null),
+                'level' => $this->resolveCategoryLevel($companyId, (int) $validated['parent_id'], $validated['level'] ?? null),
                 'margin_percent' => (float) ($validated['margin_percent'] ?? 0),
+                'is_active' => (bool) ($validated['is_active'] ?? true),
+                'updated_at' => now(),
             ]);
     }
 
@@ -296,8 +357,14 @@ class ProductCatalogController extends Controller
 
         return DB::table('units')->insertGetId([
             'company_id' => $companyId,
+            'code' => $this->generateUnitCode($companyId),
             'name' => $this->cleanName($validated['name']),
             'short_name' => strtoupper($this->cleanName($validated['short_name'])),
+            'category' => strtoupper((string) ($validated['category'] ?? 'UNIDAD')),
+            'decimal_places' => (int) ($validated['decimal_places'] ?? 0),
+            'is_active' => (bool) ($validated['is_active'] ?? true),
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
     }
 
@@ -311,6 +378,10 @@ class ProductCatalogController extends Controller
             ->update([
                 'name' => $this->cleanName($validated['name']),
                 'short_name' => strtoupper($this->cleanName($validated['short_name'])),
+                'category' => strtoupper((string) ($validated['category'] ?? 'UNIDAD')),
+                'decimal_places' => (int) ($validated['decimal_places'] ?? 0),
+                'is_active' => (bool) ($validated['is_active'] ?? true),
+                'updated_at' => now(),
             ]);
     }
 
@@ -327,7 +398,80 @@ class ProductCatalogController extends Controller
             ],
             'description' => ['nullable', 'string', 'max:500'],
             'image_url' => ['nullable', 'string', 'max:255'],
+            'is_active' => ['nullable', 'boolean'],
         ], $this->messages());
+    }
+
+    private function generateCategoryCode(int $companyId): string
+    {
+        $latestCode = DB::table('categories')
+            ->where('company_id', $companyId)
+            ->where('code', 'like', 'CAT%')
+            ->orderByDesc('code')
+            ->value('code');
+
+        if (!$latestCode) {
+            return 'CAT000001';
+        }
+
+        $numeric = (int) preg_replace('/^CAT0*/', '', $latestCode);
+        $next = $numeric > 0 ? $numeric + 1 : 1;
+
+        do {
+            $candidate = sprintf('CAT%06d', $next);
+            $exists = DB::table('categories')
+                ->where('company_id', $companyId)
+                ->where('code', $candidate)
+                ->exists();
+            $next += 1;
+        } while ($exists);
+
+        return $candidate;
+    }
+
+    private function generateUnitCode(int $companyId): string
+    {
+        $latestCode = DB::table('units')
+            ->where('company_id', $companyId)
+            ->where('code', 'like', 'UNT%')
+            ->orderByDesc('code')
+            ->value('code');
+
+        if (!$latestCode) {
+            return 'UNT000001';
+        }
+
+        $numeric = (int) preg_replace('/^UNT0*/', '', $latestCode);
+        $next = $numeric > 0 ? $numeric + 1 : 1;
+
+        do {
+            $candidate = sprintf('UNT%06d', $next);
+            $exists = DB::table('units')
+                ->where('company_id', $companyId)
+                ->where('code', $candidate)
+                ->exists();
+            $next += 1;
+        } while ($exists);
+
+        return $candidate;
+    }
+
+    private function resolveCategoryLevel(int $companyId, ?int $parentId, ?int $level): int
+    {
+        if ($level !== null) {
+            return max(1, (int) $level);
+        }
+
+        if ($parentId) {
+            $parentLevel = (int) DB::table('categories')
+                ->where('id', $parentId)
+                ->where('company_id', $companyId)
+                ->value('level');
+
+            return max(1, $parentLevel + 1);
+        }
+
+        return 1;
     }
 
     private function generateBrandCode(int $companyId): string
@@ -369,7 +513,11 @@ class ProductCatalogController extends Controller
                     ->where(fn ($query) => $query->where('company_id', $companyId)->whereNull('parent_id'))
                     ->ignore($id),
             ],
+            'description' => ['nullable', 'string', 'max:500'],
+            'image_url' => ['nullable', 'string', 'max:255'],
+            'level' => ['nullable', 'integer', 'min:1', 'max:10'],
             'margin_percent' => ['nullable', 'numeric', 'min:0'],
+            'is_active' => ['nullable', 'boolean'],
         ], $this->messages());
     }
 
@@ -392,7 +540,11 @@ class ProductCatalogController extends Controller
                     ->where(fn ($query) => $query->where('company_id', $companyId)->where('parent_id', $parentId))
                     ->ignore($id),
             ],
+            'description' => ['nullable', 'string', 'max:500'],
+            'image_url' => ['nullable', 'string', 'max:255'],
+            'level' => ['nullable', 'integer', 'min:1', 'max:10'],
             'margin_percent' => ['nullable', 'numeric', 'min:0'],
+            'is_active' => ['nullable', 'boolean'],
         ], $this->messages());
     }
 
@@ -415,6 +567,9 @@ class ProductCatalogController extends Controller
                     ->where(fn ($query) => $query->where('company_id', $companyId))
                     ->ignore($id),
             ],
+            'category' => ['nullable', 'string', 'max:20', 'in:UNIDAD,PESO,VOLUMEN,LONGITUD,OTRO'],
+            'decimal_places' => ['nullable', 'integer', 'min:0', 'max:6'],
+            'is_active' => ['nullable', 'boolean'],
         ], $this->messages());
     }
 
@@ -534,6 +689,9 @@ class ProductCatalogController extends Controller
             'parent_id.exists' => 'La categoria seleccionada no existe.',
             'short_name.required' => 'Ingresa la abreviatura.',
             'short_name.unique' => 'Ya existe una unidad con esa abreviatura.',
+            'category.in' => 'La categoria de la unidad no es válida.',
+            'decimal_places.integer' => 'Las posiciones decimales deben ser un número entero.',
+            'level.integer' => 'El nivel debe ser un número entero.',
         ];
     }
 
