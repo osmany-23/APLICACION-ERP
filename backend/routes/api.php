@@ -1,6 +1,10 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CurrencyController;
+use App\Http\Controllers\DocumentTypeController;
+use App\Http\Controllers\PaymentMethodController;
+use App\Http\Controllers\PaymentTermController;
 use App\Http\Controllers\ProductCatalogController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\RelationController;
@@ -23,6 +27,30 @@ Route::prefix('auth')->group(function () {
 });
 
 Route::middleware('erp.auth')->group(function () {
+    Route::get('/relations/suppliers/payment-terms', [RelationController::class, 'paymentTerms']);
+
+    Route::prefix('settings')->group(function () {
+        Route::get('/currencies', [CurrencyController::class, 'index']);
+        Route::post('/currencies', [CurrencyController::class, 'store']);
+        Route::put('/currencies/{id}', [CurrencyController::class, 'update'])->whereNumber('id');
+        Route::delete('/currencies/{id}', [CurrencyController::class, 'destroy'])->whereNumber('id');
+
+        Route::get('/payment-terms', [PaymentTermController::class, 'index']);
+        Route::post('/payment-terms', [PaymentTermController::class, 'store']);
+        Route::put('/payment-terms/{id}', [PaymentTermController::class, 'update'])->whereNumber('id');
+        Route::delete('/payment-terms/{id}', [PaymentTermController::class, 'destroy'])->whereNumber('id');
+
+        Route::get('/payment-methods', [PaymentMethodController::class, 'index']);
+        Route::post('/payment-methods', [PaymentMethodController::class, 'store']);
+        Route::put('/payment-methods/{id}', [PaymentMethodController::class, 'update'])->whereNumber('id');
+        Route::delete('/payment-methods/{id}', [PaymentMethodController::class, 'destroy'])->whereNumber('id');
+
+        Route::get('/document-types', [DocumentTypeController::class, 'index']);
+        Route::post('/document-types', [DocumentTypeController::class, 'store']);
+        Route::put('/document-types/{id}', [DocumentTypeController::class, 'update'])->whereNumber('id');
+        Route::delete('/document-types/{id}', [DocumentTypeController::class, 'destroy'])->whereNumber('id');
+    });
+
     Route::prefix('catalogs/{catalog}')
         ->whereIn('catalog', ['brands', 'categories', 'subcategories', 'units'])
         ->controller(ProductCatalogController::class)

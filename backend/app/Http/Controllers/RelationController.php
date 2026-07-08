@@ -108,9 +108,17 @@ class RelationController extends Controller
                 'suppliers.tax_id',
                 'suppliers.phone',
                 'suppliers.email',
+                'suppliers.website',
                 'suppliers.address',
+                'suppliers.contact_person',
+                'suppliers.contact_phone',
+                'suppliers.contact_email',
+                'suppliers.payment_term_id',
+                'suppliers.credit_limit',
+                'suppliers.credit_days',
                 'suppliers.bank_name',
                 'suppliers.bank_account',
+                'suppliers.notes',
                 'suppliers.payment_days',
                 'suppliers.status',
             ])
@@ -139,9 +147,17 @@ class RelationController extends Controller
                 'tax_id' => $supplier->tax_id,
                 'phone' => $supplier->phone,
                 'email' => $supplier->email,
+                'website' => $supplier->website,
                 'address' => $supplier->address,
+                'contact_person' => $supplier->contact_person,
+                'contact_phone' => $supplier->contact_phone,
+                'contact_email' => $supplier->contact_email,
+                'payment_term_id' => $supplier->payment_term_id ? (int) $supplier->payment_term_id : null,
+                'credit_limit' => $supplier->credit_limit !== null ? (float) $supplier->credit_limit : null,
+                'credit_days' => $supplier->credit_days !== null ? (int) $supplier->credit_days : null,
                 'bank_name' => $supplier->bank_name,
                 'bank_account' => $supplier->bank_account,
+                'notes' => $supplier->notes,
                 'payment_days' => (int) ($supplier->payment_days ?? 0),
                 'status' => (int) ($supplier->status ?? 0),
                 'products_count' => (int) $supplier->products_count,
@@ -249,8 +265,9 @@ class RelationController extends Controller
                 'companies.tax_id',
                 'companies.phone',
                 'companies.email',
-                'companies.address',
+                'companies.commercial_address as address',
                 'companies.logo',
+                'companies.currency_id',
                 'companies.status',
             ])
             ->selectSub(function ($query) {
@@ -284,6 +301,7 @@ class RelationController extends Controller
                 'email' => $company->email,
                 'address' => $company->address,
                 'logo' => $company->logo,
+                'currency_id' => $company->currency_id !== null ? (int) $company->currency_id : null,
                 'status' => (int) ($company->status ?? 0),
                 'branches_count' => (int) $company->branches_count,
                 'warehouses_count' => (int) $company->warehouses_count,
@@ -295,10 +313,11 @@ class RelationController extends Controller
 
     private function storeSupplier(Request $request, int $companyId): int
     {
-        $validated = $this->supplierValidation($request);
+        $validated = $this->supplierValidation($request, $companyId);
+        $validated['code'] = $this->generateSupplierCode($companyId);
 
         return DB::table('suppliers')->insertGetId([
-            ...$this->supplierData($validated),
+            ...$this->supplierData($validated, $companyId),
             'company_id' => $companyId,
             'created_at' => now(),
         ]);
@@ -306,12 +325,21 @@ class RelationController extends Controller
 
     private function updateSupplier(Request $request, int $companyId, int $id): void
     {
-        $validated = $this->supplierValidation($request, $id);
+        $validated = $this->supplierValidation($request, $companyId, $id);
+
+        $existingCode = DB::table('suppliers')
+            ->where('id', $id)
+            ->where('company_id', $companyId)
+            ->value('code');
+
+        $validated['code'] = !empty(trim((string) $existingCode))
+            ? $existingCode
+            : $this->generateSupplierCode($companyId);
 
         DB::table('suppliers')
             ->where('id', $id)
             ->where('company_id', $companyId)
-            ->update($this->supplierData($validated));
+            ->update($this->supplierData($validated, $companyId));
     }
 
     private function storeWarehouse(Request $request, int $companyId): int
@@ -361,37 +389,59 @@ class RelationController extends Controller
     {
         $validated = $this->companyValidation($request);
 
+        $companyData = [
+            'name' => $this->cleanName($validated['name']),
+            'legal_name' => $this->nullableText($validated['legal_name'] ?? null),
+            'tax_id' => $this->nullableText($validated['tax_id'] ?? null),
+            'phone' => $this->nullableText($validated['phone'] ?? null),
+            'email' => $this->nullableText($validated['email'] ?? null),
+            'commercial_address' => $this->nullableText($validated['commercial_address'] ?? $validated['address'] ?? null),
+            'status' => $this->statusValue($validated['status'] ?? 1),
+            'updated_at' => now(),
+        ];
+
+        if (array_key_exists('currency_id', $validated)) {
+            $companyData['currency_id'] = $validated['currency_id'] !== null ? (int) $validated['currency_id'] : 1;
+        }
+
         DB::table('companies')
             ->where('id', $companyId)
-            ->update([
-                'name' => $this->cleanName($validated['name']),
-                'legal_name' => $this->nullableText($validated['legal_name'] ?? null),
-                'tax_id' => $this->nullableText($validated['tax_id'] ?? null),
-                'phone' => $this->nullableText($validated['phone'] ?? null),
-                'email' => $this->nullableText($validated['email'] ?? null),
-                'address' => $this->nullableText($validated['address'] ?? null),
-                'status' => $this->statusValue($validated['status'] ?? 1),
-                'updated_at' => now(),
-            ]);
+            ->update($companyData);
     }
 
-    private function supplierValidation(Request $request, ?int $id = null): array
+    public function paymentTerms(Request $request): JsonResponse
+    {
+        $terms = DB::table('payment_terms')
+            ->where('is_active', true)
+            ->select(['id', 'name', 'days'])
+            ->orderBy('name')
+            ->get();
+
+        return response()->json(['data' => $terms]);
+    }
+
+    private function supplierValidation(Request $request, int $companyId, ?int $id = null): array
     {
         return $request->validate([
-            'code' => [
-                'nullable',
-                'string',
-                'max:50',
-                Rule::unique('suppliers', 'code')->ignore($id),
-            ],
             'name' => ['required', 'string', 'max:150'],
             'tax_id' => ['nullable', 'string', 'max:50'],
             'phone' => ['nullable', 'string', 'max:30'],
             'email' => ['nullable', 'email', 'max:120'],
+            'website' => ['nullable', 'url', 'max:200'],
             'address' => ['nullable', 'string'],
+            'contact_person' => ['nullable', 'string', 'max:120'],
+            'contact_phone' => ['nullable', 'string', 'max:30'],
+            'contact_email' => ['nullable', 'email', 'max:120'],
+            'payment_term_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('payment_terms', 'id'),
+            ],
             'bank_name' => ['nullable', 'string', 'max:120'],
             'bank_account' => ['nullable', 'string', 'max:100'],
-            'payment_days' => ['nullable', 'integer', 'min:0'],
+            'credit_limit' => ['nullable', 'numeric', 'min:0'],
+            'credit_days' => ['nullable', 'integer', 'min:0'],
+            'notes' => ['nullable', 'string'],
             'status' => ['required', Rule::in(['Activo', 'Inactivo', 'activo', 'inactivo', 1, 0, '1', '0', true, false])],
         ], $this->messages());
     }
@@ -429,11 +479,13 @@ class RelationController extends Controller
             'phone' => ['nullable', 'string', 'max:30'],
             'email' => ['nullable', 'email', 'max:120'],
             'address' => ['nullable', 'string'],
+            'commercial_address' => ['nullable', 'string'],
+            'currency_id' => ['nullable', 'integer', Rule::exists('currencies', 'id')],
             'status' => ['required', Rule::in(['Activo', 'Inactivo', 'activo', 'inactivo', 1, 0, '1', '0', true, false])],
         ], $this->messages());
     }
 
-    private function supplierData(array $validated): array
+    private function supplierData(array $validated, int $companyId): array
     {
         return [
             'code' => $this->nullableText($validated['code'] ?? null),
@@ -441,10 +493,18 @@ class RelationController extends Controller
             'tax_id' => $this->nullableText($validated['tax_id'] ?? null),
             'phone' => $this->nullableText($validated['phone'] ?? null),
             'email' => $this->nullableText($validated['email'] ?? null),
+            'website' => $this->nullableText($validated['website'] ?? null),
             'address' => $this->nullableText($validated['address'] ?? null),
+            'contact_person' => $this->nullableText($validated['contact_person'] ?? null),
+            'contact_phone' => $this->nullableText($validated['contact_phone'] ?? null),
+            'contact_email' => $this->nullableText($validated['contact_email'] ?? null),
+            'payment_term_id' => isset($validated['payment_term_id']) && $validated['payment_term_id'] !== null ? (int) $validated['payment_term_id'] : null,
+            'currency_id' => $this->supplierCurrencyId($companyId),
             'bank_name' => $this->nullableText($validated['bank_name'] ?? null),
             'bank_account' => $this->nullableText($validated['bank_account'] ?? null),
-            'payment_days' => (int) ($validated['payment_days'] ?? 0),
+            'credit_limit' => array_key_exists('credit_limit', $validated) ? $validated['credit_limit'] : null,
+            'credit_days' => array_key_exists('credit_days', $validated) && $validated['credit_days'] !== null ? (int) $validated['credit_days'] : null,
+            'notes' => $this->nullableText($validated['notes'] ?? null),
             'status' => $this->statusValue($validated['status'] ?? 1),
         ];
     }
@@ -457,6 +517,31 @@ class RelationController extends Controller
             'address' => $this->nullableText($validated['address'] ?? null),
             'manager_name' => $this->nullableText($validated['manager_name'] ?? null),
         ];
+    }
+
+    private function generateSupplierCode(int $companyId): string
+    {
+        $codes = DB::table('suppliers')
+            ->where('company_id', $companyId)
+            ->where('code', 'like', 'PRV-%')
+            ->pluck('code');
+
+        $next = 1;
+
+        foreach ($codes as $code) {
+            if (preg_match('/^PRV-(\d+)$/', (string) $code, $matches)) {
+                $next = max($next, (int) $matches[1] + 1);
+            }
+        }
+
+        return sprintf('PRV-%06d', $next);
+    }
+
+    private function supplierCurrencyId(int $companyId): int
+    {
+        return (int) DB::table('companies')
+            ->where('id', $companyId)
+            ->value('currency_id');
     }
 
     private function branchData(array $validated): array

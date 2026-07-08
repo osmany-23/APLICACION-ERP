@@ -63,7 +63,21 @@ class ErpBaseSeeder extends Seeder
             'updated_at' => now(),
         ]);
 
-        // 4. Empresa Principal (Requerida por las llaves foráneas globales)
+        // 4. Métodos de Pago por defecto
+        DB::table('payment_methods')->insert([
+            ['name' => 'Efectivo', 'description' => 'Pago en efectivo', 'type' => 'cash', 'requires_reference' => false, 'is_cash' => true, 'is_bank' => false, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Transferencia Bancaria', 'description' => 'Pago mediante transferencia bancaria', 'type' => 'bank', 'requires_reference' => true, 'is_cash' => false, 'is_bank' => true, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Tarjeta de Débito', 'description' => 'Pago con tarjeta de débito', 'type' => 'card', 'requires_reference' => false, 'is_cash' => false, 'is_bank' => false, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Tarjeta de Crédito', 'description' => 'Pago con tarjeta de crédito', 'type' => 'card', 'requires_reference' => false, 'is_cash' => false, 'is_bank' => false, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Cheque', 'description' => 'Pago con cheque', 'type' => 'cheque', 'requires_reference' => true, 'is_cash' => false, 'is_bank' => false, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Depósito Bancario', 'description' => 'Pago mediante depósito bancario', 'type' => 'bank', 'requires_reference' => true, 'is_cash' => false, 'is_bank' => true, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Pago Móvil', 'description' => 'Pago con aplicación móvil', 'type' => 'digital', 'requires_reference' => false, 'is_cash' => false, 'is_bank' => false, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Transferencia Internacional', 'description' => 'Pago por transferencia internacional', 'type' => 'bank', 'requires_reference' => true, 'is_cash' => false, 'is_bank' => true, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Crédito', 'description' => 'Pago a crédito', 'type' => 'credit', 'requires_reference' => true, 'is_cash' => false, 'is_bank' => false, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Otro', 'description' => 'Otro método de pago', 'type' => 'other', 'requires_reference' => false, 'is_cash' => false, 'is_bank' => false, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        // 5. Empresa Principal (Requerida por las llaves foráneas globales)
         $companyId = DB::table('companies')->insertGetId([
             'uuid' => Str::uuid(),
             'name' => 'Sigma Enterprise',

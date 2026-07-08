@@ -11,6 +11,10 @@ import Chart from './pages/Chart';
 import ECommerce from './pages/Dashboard/ECommerce';
 import FormElements from './pages/Form/FormElements';
 import FormLayout from './pages/Form/FormLayout';
+import CurrenciesPage from './pages/CurrenciesPage';
+import DocumentTypesPage from './pages/DocumentTypesPage';
+import PaymentMethodsPage from './pages/PaymentMethodsPage';
+import PaymentTermsPage from './pages/PaymentTermsPage';
 import ProductCatalogs from './pages/ProductCatalogs';
 import Products from './pages/Products';
 import Profile from './pages/Profile';
@@ -121,6 +125,42 @@ function ProtectedAppRoutes() {
               <>
                 <PageTitle title="Empresa | Sistema ERP" />
                 <RelationCatalogs relation="companies" />
+              </>
+            }
+          />
+          <Route
+            path="/settings/currencies"
+            element={
+              <>
+                <PageTitle title="Monedas | Sistema ERP" />
+                <CurrenciesPage />
+              </>
+            }
+          />
+          <Route
+            path="/settings/payment-terms"
+            element={
+              <>
+                <PageTitle title="Términos de Pago | Sistema ERP" />
+                <PaymentTermsPage />
+              </>
+            }
+          />
+          <Route
+            path="/settings/payment-methods"
+            element={
+              <>
+                <PageTitle title="Métodos de Pago | Sistema ERP" />
+                <PaymentMethodsPage />
+              </>
+            }
+          />
+          <Route
+            path="/settings/document-types"
+            element={
+              <>
+                <PageTitle title="Tipos de Documento | Sistema ERP" />
+                <DocumentTypesPage />
               </>
             }
           />

@@ -34,12 +34,19 @@ type RelationItem = {
   tax_id?: string | null;
   phone?: string | null;
   email?: string | null;
+  website?: string | null;
   address?: string | null;
   logo?: string | null;
-  bank_name?: string | null;
-  bank_account?: string | null;
+  contact_person?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
+  payment_term_id?: number | string | null;
+  credit_limit?: number | string | null;
+  credit_days?: number | string | null;
+  notes?: string | null;
   payment_days?: number | string | null;
   status?: number | string | null;
+  currency_id?: number | string | null;
   branch_id?: number | string | null;
   branch_name?: string | null;
   manager_name?: string | null;
@@ -74,11 +81,19 @@ type RelationDraft = {
   taxId: string;
   phone: string;
   email: string;
+  website: string;
   address: string;
+  contactPerson: string;
+  contactPhone: string;
+  contactEmail: string;
+  paymentTermId: string;
   bankName: string;
   bankAccount: string;
-  paymentDays: string;
+  creditLimit: string;
+  creditDays: string;
+  notes: string;
   status: 'Activo' | 'Inactivo';
+  currencyId: string;
   branchId: string;
   managerName: string;
 };
@@ -138,11 +153,19 @@ const emptyDraft: RelationDraft = {
   taxId: '',
   phone: '',
   email: '',
+  website: '',
   address: '',
+  contactPerson: '',
+  contactPhone: '',
+  contactEmail: '',
+  paymentTermId: '',
   bankName: '',
   bankAccount: '',
-  paymentDays: '0',
+  creditLimit: '',
+  creditDays: '',
+  notes: '',
   status: 'Activo',
+  currencyId: '',
   branchId: '',
   managerName: '',
 };
@@ -258,11 +281,19 @@ function draftFromItem(item: RelationItem): RelationDraft {
     taxId: item.tax_id || '',
     phone: item.phone || '',
     email: item.email || '',
+    website: item.website || '',
     address: item.address || '',
+    contactPerson: item.contact_person || '',
+    contactPhone: item.contact_phone || '',
+    contactEmail: item.contact_email || '',
+    paymentTermId: item.payment_term_id ? String(item.payment_term_id) : '',
     bankName: item.bank_name || '',
     bankAccount: item.bank_account || '',
-    paymentDays: String(readNumber(item.payment_days)),
+    creditLimit: item.credit_limit ? String(item.credit_limit) : '',
+    creditDays: item.credit_days ? String(item.credit_days) : '',
+    notes: item.notes || '',
     status: normalizeStatus(item.status ?? 1),
+    currencyId: item.currency_id ? String(item.currency_id) : '',
     branchId: item.branch_id ? String(item.branch_id) : '',
     managerName: item.manager_name || '',
   };
@@ -275,6 +306,8 @@ function RelationCatalogs({ relation }: { relation: RelationType }) {
   const canDelete = config.allowDelete !== false;
   const [items, setItems] = useState<RelationItem[]>([]);
   const [branches, setBranches] = useState<RelationItem[]>([]);
+  const [paymentTerms, setPaymentTerms] = useState<{ id: number; name: string; days: number | null }[]>([]);
+  const [currencies, setCurrencies] = useState<{ id: number; name: string; code: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState('');
   const [notice, setNotice] = useState('');
@@ -297,19 +330,28 @@ function RelationCatalogs({ relation }: { relation: RelationType }) {
     setPageError('');
 
     try {
-      const [itemsResponse, branchesResponse] = await Promise.all([
+      const [itemsResponse, branchesResponse, paymentTermsResponse, currenciesResponse] = await Promise.all([
         apiRequest<RelationResponse>(`/relations/${relation}`, {}, token),
         relation === 'warehouses'
           ? apiRequest<RelationResponse>('/relations/branches', {}, token)
+          : Promise.resolve({ data: [] }),
+        relation === 'suppliers'
+          ? apiRequest<{ data: { id: number; name: string; days: number | null }[] }>('/relations/suppliers/payment-terms', {}, token)
+          : Promise.resolve({ data: [] }),
+        relation === 'companies'
+          ? apiRequest<{ data: { id: number; name: string; code: string }[] }>('/settings/currencies', {}, token)
           : Promise.resolve({ data: [] }),
       ]);
 
       setItems(itemsResponse.data.map(mapItem));
       setBranches(branchesResponse.data.map(mapItem));
+      setPaymentTerms(paymentTermsResponse.data);
+      setCurrencies(currenciesResponse.data);
     } catch (error) {
       setPageError(getErrorMessage(error));
       setItems([]);
       setBranches([]);
+      setCurrencies([]);
     } finally {
       setLoading(false);
     }
@@ -372,7 +414,7 @@ function RelationCatalogs({ relation }: { relation: RelationType }) {
 
   const tableColumns =
     relation === 'suppliers'
-      ? 6
+      ? 7
       : relation === 'warehouses'
         ? 6
         : relation === 'branches'
@@ -420,15 +462,21 @@ function RelationCatalogs({ relation }: { relation: RelationType }) {
   function relationPayload() {
     if (relation === 'suppliers') {
       return {
-        code: draft.code.trim(),
         name: draft.name.trim(),
         tax_id: draft.taxId.trim(),
         phone: draft.phone.trim(),
         email: draft.email.trim(),
+        website: draft.website.trim(),
         address: draft.address.trim(),
+        contact_person: draft.contactPerson.trim(),
+        contact_phone: draft.contactPhone.trim(),
+        contact_email: draft.contactEmail.trim(),
+        payment_term_id: draft.paymentTermId ? Number(draft.paymentTermId) : null,
         bank_name: draft.bankName.trim(),
         bank_account: draft.bankAccount.trim(),
-        payment_days: Number(draft.paymentDays || 0),
+        credit_limit: draft.creditLimit ? Number(draft.creditLimit) : null,
+        credit_days: draft.creditDays ? Number(draft.creditDays) : null,
+        notes: draft.notes.trim(),
         status: draft.status,
       };
     }
@@ -458,6 +506,7 @@ function RelationCatalogs({ relation }: { relation: RelationType }) {
       phone: draft.phone.trim(),
       email: draft.email.trim(),
       address: draft.address.trim(),
+      currency_id: Number(draft.currencyId) || 1,
       status: draft.status,
     };
   }
@@ -689,18 +738,28 @@ function RelationCatalogs({ relation }: { relation: RelationType }) {
           <table className="w-full min-w-[920px] table-auto">
             <thead>
               <tr className="bg-gray-50 text-left dark:bg-meta-4">
-                <th className="px-4 py-4 text-xs font-black uppercase text-black dark:text-white">
-                  {relation === 'companies' ? 'Empresa' : 'Nombre'}
-                </th>
-                {relation === 'suppliers' && (
+                {relation === 'suppliers' ? (
                   <>
+                    <th className="px-4 py-4 text-xs font-black uppercase text-black dark:text-white">
+                      Imagen
+                    </th>
+                    <th className="px-4 py-4 text-xs font-black uppercase text-black dark:text-white">
+                      Nombre
+                    </th>
+                    <th className="px-4 py-4 text-xs font-black uppercase text-black dark:text-white">
+                      Código
+                    </th>
+                    <th className="px-4 py-4 text-xs font-black uppercase text-black dark:text-white">
+                      Banco
+                    </th>
                     <th className="px-4 py-4 text-xs font-black uppercase text-black dark:text-white">
                       Contacto
                     </th>
-                    <th className="px-4 py-4 text-xs font-black uppercase text-black dark:text-white">
-                      Banco / Credito
-                    </th>
                   </>
+                ) : (
+                  <th className="px-4 py-4 text-xs font-black uppercase text-black dark:text-white">
+                    {relation === 'companies' ? 'Empresa' : 'Nombre'}
+                  </th>
                 )}
                 {relation === 'warehouses' && (
                   <>
@@ -732,9 +791,11 @@ function RelationCatalogs({ relation }: { relation: RelationType }) {
                     </th>
                   </>
                 )}
-                <th className="px-4 py-4 text-xs font-black uppercase text-black dark:text-white">
-                  Productos
-                </th>
+                {relation !== 'suppliers' && (
+                  <th className="px-4 py-4 text-xs font-black uppercase text-black dark:text-white">
+                    Productos
+                  </th>
+                )}
                 <th className="px-4 py-4 text-xs font-black uppercase text-black dark:text-white">
                   Estado
                 </th>
@@ -761,34 +822,57 @@ function RelationCatalogs({ relation }: { relation: RelationType }) {
                     key={item.id}
                     className="border-t border-stroke bg-white dark:border-strokedark dark:bg-boxdark"
                   >
-                    <td className="px-4 py-5">
-                      <p className="text-base font-black text-black dark:text-white">
-                        {item.name}
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-slate-500">
-                        {relation === 'suppliers'
-                          ? item.code || 'Sin codigo'
-                          : relation === 'companies'
-                            ? item.legal_name || item.tax_id || 'Datos legales pendientes'
-                            : item.address || 'Sin direccion'}
-                      </p>
-                    </td>
-
-                    {relation === 'suppliers' && (
+                    {relation === 'suppliers' ? (
                       <>
-                        <td className="px-4 py-5 text-sm font-semibold text-black dark:text-white">
-                          <p>{item.phone || 'Sin telefono'}</p>
-                          <p className="mt-1 text-slate-500">
-                            {item.email || item.tax_id || 'Sin correo'}
+                        <td className="px-4 py-5">
+                          <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border border-stroke bg-slate-100">
+                            {item.image_url ? (
+                              <img
+                                src={item.image_url}
+                                alt={item.name}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <span className="text-xs font-semibold uppercase text-slate-500">
+                                Sin imagen
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-5">
+                          <p className="text-base font-black text-black dark:text-white">
+                            {item.name}
                           </p>
+                          <p className="mt-1 text-sm font-semibold text-slate-500">
+                            {item.tax_id || item.email || 'Sin info'}
+                          </p>
+                        </td>
+                        <td className="px-4 py-5 text-sm font-semibold text-black dark:text-white">
+                          {item.code || 'Sin código'}
                         </td>
                         <td className="px-4 py-5 text-sm font-semibold text-black dark:text-white">
                           <p>{item.bank_name || 'Sin banco'}</p>
                           <p className="mt-1 text-slate-500">
-                            {readNumber(item.payment_days)} dias
+                            {item.bank_account || 'Sin cuenta'}
                           </p>
                         </td>
+                        <td className="px-4 py-5 text-sm font-semibold text-black dark:text-white">
+                          <p>{item.contact_person || item.phone || 'Sin contacto'}</p>
+                          <p className="mt-1 text-slate-500">
+                            {item.contact_phone || item.email || 'Sin contacto'}</p>
+                        </td>
                       </>
+                    ) : (
+                      <td className="px-4 py-5">
+                        <p className="text-base font-black text-black dark:text-white">
+                          {item.name}
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-slate-500">
+                          {relation === 'companies'
+                            ? item.legal_name || item.tax_id || 'Datos legales pendientes'
+                            : item.address || 'Sin direccion'}
+                        </p>
+                      </td>
                     )}
 
                     {relation === 'warehouses' && (
@@ -895,17 +979,6 @@ function RelationCatalogs({ relation }: { relation: RelationType }) {
             )}
 
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-              {relation === 'suppliers' && (
-                <Field label="Codigo">
-                  <input
-                    value={draft.code}
-                    onChange={(event) => updateDraft('code', event.target.value)}
-                    className={inputClass}
-                    placeholder="PROV-001"
-                  />
-                </Field>
-              )}
-
               <Field label={relation === 'companies' ? 'Nombre comercial' : 'Nombre'}>
                 <input
                   value={draft.name}
@@ -936,6 +1009,23 @@ function RelationCatalogs({ relation }: { relation: RelationType }) {
                     className={inputClass}
                     placeholder="RUC"
                   />
+                </Field>
+              )}
+
+              {relation === 'companies' && (
+                <Field label="Moneda base">
+                  <select
+                    value={draft.currencyId}
+                    onChange={(event) => updateDraft('currencyId', event.target.value)}
+                    className={selectClass}
+                  >
+                    <option value="">Selecciona una moneda</option>
+                    {currencies.map((currency) => (
+                      <option key={currency.id} value={currency.id}>
+                        {currency.name} ({currency.code})
+                      </option>
+                    ))}
+                  </select>
                 </Field>
               )}
 
@@ -997,35 +1087,96 @@ function RelationCatalogs({ relation }: { relation: RelationType }) {
 
               {relation === 'suppliers' && (
                 <>
-                  <Field label="Banco">
+                  <Field label="Sitio web">
                     <input
-                      value={draft.bankName}
+                      value={draft.website}
                       onChange={(event) =>
-                        updateDraft('bankName', event.target.value)
+                        updateDraft('website', event.target.value)
                       }
                       className={inputClass}
-                      placeholder="Banco"
+                      placeholder="https://proveedor.com"
                     />
                   </Field>
-                  <Field label="Cuenta bancaria">
+                  <Field label="Persona de contacto">
                     <input
-                      value={draft.bankAccount}
+                      value={draft.contactPerson}
                       onChange={(event) =>
-                        updateDraft('bankAccount', event.target.value)
+                        updateDraft('contactPerson', event.target.value)
                       }
                       className={inputClass}
-                      placeholder="Numero de cuenta"
+                      placeholder="Nombre del contacto"
+                    />
+                  </Field>
+                  <Field label="Telefono de contacto">
+                    <input
+                      value={draft.contactPhone}
+                      onChange={(event) =>
+                        updateDraft('contactPhone', event.target.value)
+                      }
+                      className={inputClass}
+                      placeholder="8888-8888"
+                    />
+                  </Field>
+                  <Field label="Correo de contacto">
+                    <input
+                      type="email"
+                      value={draft.contactEmail}
+                      onChange={(event) =>
+                        updateDraft('contactEmail', event.target.value)
+                      }
+                      className={inputClass}
+                      placeholder="contacto@proveedor.com"
+                    />
+                  </Field>
+                  <Field label="Plazo de pago">
+                    <select
+                      value={draft.paymentTermId}
+                      onChange={(event) =>
+                        updateDraft('paymentTermId', event.target.value)
+                      }
+                      className={selectClass}
+                    >
+                      <option value="">Selecciona un plazo</option>
+                      {paymentTerms.map((term) => (
+                        <option key={term.id} value={term.id}>
+                          {term.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Limite de credito">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={draft.creditLimit}
+                      onChange={(event) =>
+                        updateDraft('creditLimit', event.target.value)
+                      }
+                      className={inputClass}
+                      placeholder="0.00"
                     />
                   </Field>
                   <Field label="Dias de credito">
                     <input
                       type="number"
                       min="0"
-                      value={draft.paymentDays}
+                      value={draft.creditDays}
                       onChange={(event) =>
-                        updateDraft('paymentDays', event.target.value)
+                        updateDraft('creditDays', event.target.value)
                       }
                       className={inputClass}
+                      placeholder="0"
+                    />
+                  </Field>
+                  <Field label="Notas">
+                    <textarea
+                      value={draft.notes}
+                      onChange={(event) =>
+                        updateDraft('notes', event.target.value)
+                      }
+                      className={textareaClass}
+                      placeholder="Comentarios adicionales"
                     />
                   </Field>
                 </>
