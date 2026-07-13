@@ -12,7 +12,7 @@ class PaymentMethodController extends Controller
     public function index(): JsonResponse
     {
         $items = DB::table('payment_methods')
-            ->select(['id', 'code', 'name', 'description', 'is_active'])
+            ->select(['id', 'code', 'name', 'description', 'requires_reference', 'requires_bank', 'is_active'])
             ->orderBy('name')
             ->get()
             ->map(fn ($method) => [
@@ -20,7 +20,9 @@ class PaymentMethodController extends Controller
                 'code' => (string) ($method->code ?? ''),
                 'name' => (string) $method->name,
                 'description' => $method->description !== null ? (string) $method->description : null,
-                'is_active' => (bool) $method->is_active,
+                'requires_reference' => (bool) ($method->requires_reference ?? false),
+                'requires_bank' => (bool) ($method->requires_bank ?? false),
+                'is_active' => (bool) ($method->is_active ?? true),
             ]);
 
         return response()->json(['data' => $items]);
@@ -34,7 +36,9 @@ class PaymentMethodController extends Controller
             'code' => strtoupper(trim($validated['code'])),
             'name' => trim($validated['name']),
             'description' => isset($validated['description']) ? trim($validated['description']) : null,
-            'is_active' => (bool) $validated['is_active'],
+            'requires_reference' => (bool) ($validated['requires_reference'] ?? false),
+            'requires_bank' => (bool) ($validated['requires_bank'] ?? false),
+            'is_active' => (bool) ($validated['is_active'] ?? true),
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -55,7 +59,9 @@ class PaymentMethodController extends Controller
             'code' => strtoupper(trim($validated['code'])),
             'name' => trim($validated['name']),
             'description' => isset($validated['description']) ? trim($validated['description']) : null,
-            'is_active' => (bool) $validated['is_active'],
+            'requires_reference' => (bool) ($validated['requires_reference'] ?? false),
+            'requires_bank' => (bool) ($validated['requires_bank'] ?? false),
+            'is_active' => (bool) ($validated['is_active'] ?? true),
             'updated_at' => now(),
         ]);
 

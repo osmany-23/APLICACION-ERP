@@ -12,10 +12,14 @@ class PaymentMethod extends Model
         'code',
         'name',
         'description',
+        'requires_reference',
+        'requires_bank',
         'is_active',
     ];
 
     protected $casts = [
+        'requires_reference' => 'boolean',
+        'requires_bank' => 'boolean',
         'is_active' => 'boolean',
     ];
 }

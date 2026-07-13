@@ -25,6 +25,8 @@ class PaymentMethodRequest extends FormRequest
                 Rule::unique('payment_methods', 'name')->ignore($paymentMethodId),
             ],
             'description' => ['nullable', 'string', 'max:255'],
+            'requires_reference' => ['nullable', 'boolean'],
+            'requires_bank' => ['nullable', 'boolean'],
             'is_active' => ['required', 'boolean'],
         ];
     }
@@ -39,6 +41,8 @@ class PaymentMethodRequest extends FormRequest
             'name.unique' => 'El nombre ya existe.',
             'name.max' => 'El nombre no puede superar los 80 caracteres.',
             'description.max' => 'La descripción no puede superar los 255 caracteres.',
+            'requires_reference.boolean' => 'El flag de referencia debe ser verdadero o falso.',
+            'requires_bank.boolean' => 'El flag de banco debe ser verdadero o falso.',
             'is_active.required' => 'El estado es obligatorio.',
             'is_active.boolean' => 'El estado debe ser verdadero o falso.',
         ];

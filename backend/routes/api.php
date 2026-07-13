@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CurrencyController;
 use App\Http\Controllers\DocumentTypeController;
+use App\Http\Controllers\GlobalCatalogController;
 use App\Http\Controllers\PaymentMethodController;
 use App\Http\Controllers\PaymentTermController;
 use App\Http\Controllers\ProductCatalogController;
@@ -28,6 +29,13 @@ Route::prefix('auth')->group(function () {
 
 Route::middleware('erp.auth')->group(function () {
     Route::get('/relations/suppliers/payment-terms', [RelationController::class, 'paymentTerms']);
+
+    Route::prefix('global-catalogs')->group(function () {
+        Route::get('/{catalog}', [GlobalCatalogController::class, 'index']);
+        Route::post('/{catalog}', [GlobalCatalogController::class, 'store']);
+        Route::put('/{catalog}/{id}', [GlobalCatalogController::class, 'update'])->whereNumber('id');
+        Route::delete('/{catalog}/{id}', [GlobalCatalogController::class, 'destroy'])->whereNumber('id');
+    });
 
     Route::prefix('settings')->group(function () {
         Route::get('/currencies', [CurrencyController::class, 'index']);

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\DocumentTypeRequest;
+use App\Models\DocumentType;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -31,19 +32,24 @@ class DocumentTypeController extends Controller
     {
         $validated = $request->validated();
 
-        $id = DB::table('document_types')->insertGetId([
-            'code' => strtoupper(trim($validated['code'])),
-            'name' => trim($validated['name']),
-            'prefix' => isset($validated['prefix']) ? trim($validated['prefix']) : null,
-            'next_number' => (int) ($validated['next_number'] ?? 1),
-            'is_active' => (bool) ($validated['is_active']),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        $item = DB::transaction(function () use ($validated): DocumentType {
+            $prefix = isset($validated['prefix']) ? strtoupper(trim($validated['prefix'])) : null;
+            $code = $prefix ?: 'DOC';
+
+            $documentType = DocumentType::create([
+                'code' => $code,
+                'name' => trim($validated['name']),
+                'prefix' => $prefix,
+                'next_number' => 1,
+                'is_active' => (bool) $validated['is_active'],
+            ]);
+
+            return $documentType;
+        });
 
         return response()->json([
             'message' => 'Tipo de documento guardado correctamente.',
-            'item' => DB::table('document_types')->where('id', $id)->first(),
+            'item' => $this->serializeItem($item),
         ], 201);
     }
 
@@ -53,18 +59,25 @@ class DocumentTypeController extends Controller
 
         $validated = $request->validated();
 
-        DB::table('document_types')->where('id', $id)->update([
-            'code' => strtoupper(trim($validated['code'])),
-            'name' => trim($validated['name']),
-            'prefix' => isset($validated['prefix']) ? trim($validated['prefix']) : null,
-            'next_number' => (int) ($validated['next_number'] ?? 1),
-            'is_active' => (bool) ($validated['is_active']),
-            'updated_at' => now(),
-        ]);
+        $item = DB::transaction(function () use ($validated, $id): DocumentType {
+            $documentType = DocumentType::findOrFail($id);
+            $prefix = isset($validated['prefix']) ? strtoupper(trim($validated['prefix'])) : null;
+            $code = $prefix ?: 'DOC';
+
+            $documentType->fill([
+                'code' => $code,
+                'name' => trim($validated['name']),
+                'prefix' => $prefix,
+                'is_active' => (bool) $validated['is_active'],
+            ]);
+            $documentType->save();
+
+            return $documentType;
+        });
 
         return response()->json([
             'message' => 'Tipo de documento guardado correctamente.',
-            'item' => DB::table('document_types')->where('id', $id)->first(),
+            'item' => $this->serializeItem($item),
         ]);
     }
 
@@ -84,5 +97,17 @@ class DocumentTypeController extends Controller
     private function ensureItemExists(int $id): void
     {
         abort_unless(DB::table('document_types')->where('id', $id)->exists(), 404, 'Registro no encontrado.');
+    }
+
+    private function serializeItem(DocumentType $documentType): array
+    {
+        return [
+            'id' => (int) $documentType->id,
+            'code' => (string) ($documentType->code ?? ''),
+            'name' => (string) $documentType->name,
+            'prefix' => $documentType->prefix !== null ? (string) $documentType->prefix : null,
+            'next_number' => (int) ($documentType->next_number ?? 1),
+            'is_active' => (bool) ($documentType->is_active ?? true),
+        ];
     }
 }

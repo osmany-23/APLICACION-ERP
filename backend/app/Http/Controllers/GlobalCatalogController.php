@@ -118,7 +118,7 @@ class GlobalCatalogController extends Controller
     private function paymentMethods(): array
     {
         return DB::table('payment_methods')
-            ->select(['id', 'code', 'name', 'description', 'is_active'])
+            ->select(['id', 'code', 'name', 'description', 'requires_reference', 'requires_bank', 'is_active'])
             ->orderBy('name')
             ->get()
             ->map(fn ($method) => [
@@ -126,6 +126,8 @@ class GlobalCatalogController extends Controller
                 'code' => (string) ($method->code ?? ''),
                 'name' => (string) $method->name,
                 'description' => (string) ($method->description ?? ''),
+                'requires_reference' => (bool) ($method->requires_reference ?? false),
+                'requires_bank' => (bool) ($method->requires_bank ?? false),
                 'is_active' => (bool) ($method->is_active ?? true),
             ])
             ->values()
@@ -170,6 +172,8 @@ class GlobalCatalogController extends Controller
             'code' => strtoupper($validated['code']),
             'name' => $this->cleanName($validated['name']),
             'description' => $this->nullableText($validated['description'] ?? null),
+            'requires_reference' => (bool) ($validated['requires_reference'] ?? false),
+            'requires_bank' => (bool) ($validated['requires_bank'] ?? false),
             'is_active' => (bool) ($validated['is_active'] ?? true),
             'created_at' => now(),
             'updated_at' => now(),
@@ -212,6 +216,8 @@ class GlobalCatalogController extends Controller
             'code' => strtoupper($validated['code']),
             'name' => $this->cleanName($validated['name']),
             'description' => $this->nullableText($validated['description'] ?? null),
+            'requires_reference' => (bool) ($validated['requires_reference'] ?? false),
+            'requires_bank' => (bool) ($validated['requires_bank'] ?? false),
             'is_active' => (bool) ($validated['is_active'] ?? true),
             'updated_at' => now(),
         ]);
@@ -245,6 +251,8 @@ class GlobalCatalogController extends Controller
             'code' => ['required', 'string', 'max:20', Rule::unique('payment_methods', 'code')->ignore($request->route('id'))],
             'name' => ['required', 'string', 'max:80', Rule::unique('payment_methods', 'name')->ignore($request->route('id'))],
             'description' => ['nullable', 'string', 'max:255'],
+            'requires_reference' => ['nullable', 'boolean'],
+            'requires_bank' => ['nullable', 'boolean'],
             'is_active' => ['required', 'boolean'],
         ], $this->messages());
     }

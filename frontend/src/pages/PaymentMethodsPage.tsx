@@ -8,6 +8,8 @@ type PaymentMethod = {
   code: string;
   name: string;
   description?: string | null;
+  requires_reference: boolean;
+  requires_bank: boolean;
   is_active: boolean;
 };
 
@@ -31,6 +33,8 @@ type FormState = {
   code: string;
   name: string;
   description: string;
+  requires_reference: boolean;
+  requires_bank: boolean;
   is_active: boolean;
 };
 
@@ -38,6 +42,8 @@ const emptyForm: FormState = {
   code: '',
   name: '',
   description: '',
+  requires_reference: false,
+  requires_bank: false,
   is_active: true,
 };
 
@@ -169,6 +175,8 @@ export default function PaymentMethodsPage() {
       code: item.code,
       name: item.name,
       description: item.description ?? '',
+      requires_reference: item.requires_reference,
+      requires_bank: item.requires_bank,
       is_active: item.is_active,
     });
     setEditing(item);
@@ -213,6 +221,8 @@ export default function PaymentMethodsPage() {
             code: form.code.trim(),
             name: form.name.trim(),
             description: form.description.trim() || null,
+            requires_reference: form.requires_reference,
+            requires_bank: form.requires_bank,
             is_active: form.is_active,
           }),
         },
@@ -292,10 +302,11 @@ export default function PaymentMethodsPage() {
           <table className="min-w-full text-left">
             <thead>
               <tr className="border-b border-stroke text-sm font-semibold text-black dark:border-strokedark dark:text-white">
+                <th className="px-3 py-3">Código</th>
                 <th className="px-3 py-3">Nombre</th>
                 <th className="px-3 py-3">Descripción</th>
-                <th className="px-3 py-3">Tipo</th>
-                <th className="px-3 py-3">Requiere referencia</th>
+                <th className="px-3 py-3">Ref.</th>
+                <th className="px-3 py-3">Banco</th>
                 <th className="px-3 py-3">Estado</th>
                 <th className="px-3 py-3 text-right">Acciones</th>
               </tr>
@@ -306,6 +317,8 @@ export default function PaymentMethodsPage() {
                   <td className="px-3 py-3 font-semibold text-black dark:text-white">{item.code}</td>
                   <td className="px-3 py-3">{item.name}</td>
                   <td className="px-3 py-3">{item.description ?? '-'}</td>
+                  <td className="px-3 py-3">{item.requires_reference ? 'Sí' : 'No'}</td>
+                  <td className="px-3 py-3">{item.requires_bank ? 'Sí' : 'No'}</td>
                   <td className="px-3 py-3">{item.is_active ? 'Activo' : 'Inactivo'}</td>
                   <td className="px-3 py-3">
                     <div className="flex justify-end gap-2">
@@ -361,6 +374,12 @@ export default function PaymentMethodsPage() {
                   className="min-h-28 w-full rounded-lg border border-stroke bg-white px-4 py-3 text-sm text-black outline-none transition focus:border-primary dark:border-strokedark dark:bg-boxdark dark:text-white"
                   placeholder="Descripción opcional"
                 />
+              </Field>
+              <Field label="Requiere referencia" error={formErrors.description}>
+                <SwitchField checked={form.requires_reference} onChange={(checked) => updateForm('requires_reference', checked)} label="Requiere referencia" />
+              </Field>
+              <Field label="Requiere banco" error={formErrors.description}>
+                <SwitchField checked={form.requires_bank} onChange={(checked) => updateForm('requires_bank', checked)} label="Requiere banco" />
               </Field>
               <Field label="Estado" error={formErrors.is_active}>
                 <SwitchField checked={form.is_active} onChange={(checked) => updateForm('is_active', checked)} label="Estado" />

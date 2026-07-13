@@ -13,6 +13,8 @@ return new class extends Migration
             $table->string('code', 20)->unique();
             $table->string('name', 80)->unique();
             $table->text('description')->nullable();
+            $table->boolean('requires_reference')->default(false);
+            $table->boolean('requires_bank')->default(false);
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });

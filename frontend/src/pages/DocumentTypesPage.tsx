@@ -27,18 +27,14 @@ type DeleteResponse = {
 };
 
 type FormState = {
-  code: string;
   name: string;
   prefix: string;
-  nextNumber: string;
   is_active: boolean;
 };
 
 const emptyForm: FormState = {
-  code: '',
   name: '',
   prefix: '',
-  nextNumber: '1',
   is_active: true,
 };
 
@@ -109,12 +105,6 @@ export default function DocumentTypesPage() {
   function validateForm(state: FormState) {
     const errors: Partial<Record<keyof FormState, string>> = {};
 
-    if (!state.code.trim()) {
-      errors.code = 'El código es obligatorio.';
-    } else if (state.code.trim().length > 20) {
-      errors.code = 'El código no puede superar los 20 caracteres.';
-    }
-
     if (!state.name.trim()) {
       errors.name = 'El nombre es obligatorio.';
     } else if (state.name.trim().length > 80) {
@@ -125,16 +115,16 @@ export default function DocumentTypesPage() {
       errors.prefix = 'El prefijo no puede superar los 10 caracteres.';
     }
 
-    if (!state.nextNumber.trim() || Number.isNaN(Number(state.nextNumber)) || Number(state.nextNumber) < 1) {
-      errors.nextNumber = 'El siguiente número debe ser un entero mayor o igual a 1.';
-    }
-
     return errors;
   }
 
   function updateForm(field: keyof FormState, value: string | boolean) {
-    setForm((current) => ({ ...current, [field]: value }));
-    setFormErrors((current) => ({ ...current, [field]: undefined }));
+    setForm((current) => {
+      const nextValue = { ...current, [field]: value };
+      const fieldErrors = validateForm(nextValue);
+      setFormErrors((currentErrors) => ({ ...currentErrors, [field]: fieldErrors[field] }));
+      return nextValue;
+    });
   }
 
   function openCreate() {
@@ -148,10 +138,8 @@ export default function DocumentTypesPage() {
 
   function openEdit(item: DocumentType) {
     setForm({
-      code: item.code,
       name: item.name,
       prefix: item.prefix ?? '',
-      nextNumber: String(item.next_number),
       is_active: item.is_active,
     });
     setEditing(item);
@@ -192,10 +180,8 @@ export default function DocumentTypesPage() {
         {
           method: editing ? 'PUT' : 'POST',
           body: JSON.stringify({
-            code: form.code.trim(),
             name: form.name.trim(),
             prefix: form.prefix.trim() || null,
-            next_number: Number(form.nextNumber),
             is_active: form.is_active,
           }),
         },
@@ -238,7 +224,7 @@ export default function DocumentTypesPage() {
   const filteredItems = useMemo(() => {
     const normalized = normalizeText(search);
     return items.filter((item) =>
-      normalizeText(`${item.code} ${item.name} ${item.prefix ?? ''} ${item.next_number}`).includes(normalized),
+      normalizeText(`${item.name} ${item.prefix ?? ''}`).includes(normalized),
     );
   }, [items, search]);
 
@@ -277,10 +263,8 @@ export default function DocumentTypesPage() {
           <table className="min-w-full text-left">
             <thead>
               <tr className="border-b border-stroke text-sm font-semibold text-black dark:border-strokedark dark:text-white">
-                <th className="px-3 py-3">Código</th>
                 <th className="px-3 py-3">Nombre</th>
                 <th className="px-3 py-3">Prefijo</th>
-                <th className="px-3 py-3">Siguiente número</th>
                 <th className="px-3 py-3">Estado</th>
                 <th className="px-3 py-3 text-right">Acciones</th>
               </tr>
@@ -288,11 +272,13 @@ export default function DocumentTypesPage() {
             <tbody>
               {filteredItems.map((item) => (
                 <tr key={item.id} className="border-b border-stroke text-sm dark:border-strokedark">
-                  <td className="px-3 py-3 font-semibold text-black dark:text-white">{item.code}</td>
                   <td className="px-3 py-3">{item.name}</td>
                   <td className="px-3 py-3">{item.prefix ?? '-'}</td>
-                  <td className="px-3 py-3">{item.next_number}</td>
-                  <td className="px-3 py-3">{item.is_active ? 'Activo' : 'Inactivo'}</td>
+                  <td className="px-3 py-3">
+                    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${item.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      {item.is_active ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </td>
                   <td className="px-3 py-3">
                     <div className="flex justify-end gap-2">
                       <button type="button" onClick={() => openEdit(item)} className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#0F9F37] text-[#0F9F37] hover:bg-[#0F9F37] hover:text-white">
@@ -330,15 +316,7 @@ export default function DocumentTypesPage() {
             )}
 
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-              <Field label="Código" error={formErrors.code}>
-                <input
-                  value={form.code}
-                  onChange={(event) => updateForm('code', event.target.value)}
-                  className={inputClass}
-                  placeholder="FACT"
-                />
-              </Field>
-              <Field label="Nombre" error={formErrors.name}>
+              <Field label="Nombre *" error={formErrors.name}>
                 <input
                   value={form.name}
                   onChange={(event) => updateForm('name', event.target.value)}
@@ -346,32 +324,35 @@ export default function DocumentTypesPage() {
                   placeholder="Factura"
                 />
               </Field>
-              <Field label="Prefijo" error={formErrors.prefix}>
-                <input
-                  value={form.prefix}
-                  onChange={(event) => updateForm('prefix', event.target.value)}
-                  className={inputClass}
-                  placeholder="FAC-"
-                />
-              </Field>
-              <Field label="Siguiente número" error={formErrors.nextNumber}>
-                <input
-                  type="number"
-                  min="1"
-                  value={form.nextNumber}
-                  onChange={(event) => updateForm('nextNumber', event.target.value)}
-                  className={inputClass}
-                  placeholder="1"
-                />
-              </Field>
-              <Field label="Estado">
-                <input
-                  type="checkbox"
-                  checked={form.is_active}
-                  onChange={(event) => updateForm('is_active', event.target.checked)}
-                  className="h-5 w-5 rounded border border-stroke text-primary focus:ring-primary"
-                />
-              </Field>
+              <div className="md:col-span-2">
+                <Field label="Prefijo (Opcional)" error={formErrors.prefix}>
+                  <input
+                    value={form.prefix}
+                    onChange={(event) => updateForm('prefix', event.target.value)}
+                    className={inputClass}
+                    placeholder="FAC-"
+                  />
+                </Field>
+              </div>
+              <div className="md:col-span-2">
+                <div className="rounded-xl border border-stroke bg-slate-50 p-4 dark:border-strokedark dark:bg-boxdark/60">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-black dark:text-white">Estado</p>
+                      <p className="text-sm text-slate-500">Activa o desactiva este tipo de documento.</p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={form.is_active}
+                      onClick={() => updateForm('is_active', !form.is_active)}
+                      className={`relative inline-flex h-7 w-14 items-center rounded-full transition ${form.is_active ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                    >
+                      <span className={`inline-block h-6 w-6 transform rounded-full bg-white shadow transition ${form.is_active ? 'translate-x-7' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">

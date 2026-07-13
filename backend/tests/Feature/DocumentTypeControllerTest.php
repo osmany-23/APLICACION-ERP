@@ -2,12 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Models\DocumentType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
-class PaymentMethodsControllerTest extends TestCase
+class DocumentTypeControllerTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -36,10 +37,10 @@ class PaymentMethodsControllerTest extends TestCase
         $userId = DB::table('users')->insertGetId([
             'company_id' => $companyId,
             'uuid' => (string) Str::uuid(),
-            'username' => 'payment-user',
+            'username' => 'document-user',
             'password_hash' => bcrypt('password'),
-            'full_name' => 'Payment User',
-            'email' => 'payment@example.com',
+            'full_name' => 'Document User',
+            'email' => 'document@example.com',
             'status' => 1,
             'created_at' => now(),
             'updated_at' => now(),
@@ -54,33 +55,33 @@ class PaymentMethodsControllerTest extends TestCase
         ]);
     }
 
-    public function test_payment_methods_can_be_created_and_listed_in_their_own_api(): void
+    public function test_document_type_creation_starts_next_number_at_one_without_code_field(): void
     {
         $this->authenticateUser();
 
         $response = $this->withHeader('Authorization', 'Bearer test-token')
-            ->postJson('/api/settings/payment-methods', [
-                'code' => 'TRF',
-                'name' => 'Transferencia Bancaria',
-                'description' => 'Pago por transferencia',
-                'requires_reference' => true,
-                'requires_bank' => true,
+            ->postJson('/api/settings/document-types', [
+                'name' => 'Factura',
+                'prefix' => 'FACT',
                 'is_active' => true,
             ]);
 
         $response->assertCreated();
-        $response->assertJsonPath('item.name', 'Transferencia Bancaria');
-        $this->assertDatabaseHas('payment_methods', [
-            'code' => 'TRF',
-            'name' => 'Transferencia Bancaria',
-            'requires_reference' => true,
-            'requires_bank' => true,
+        $response->assertJsonPath('item.next_number', 1);
+        $this->assertDatabaseHas('document_types', ['prefix' => 'FACT', 'next_number' => 1]);
+    }
+
+    public function test_document_number_generation_uses_the_document_type_prefix_sequence(): void
+    {
+        $documentType = DocumentType::create([
+            'code' => 'FACT',
+            'name' => 'Factura',
+            'prefix' => 'FACT',
+            'next_number' => 1,
+            'is_active' => true,
         ]);
 
-        $listResponse = $this->withHeader('Authorization', 'Bearer test-token')
-            ->getJson('/api/settings/payment-methods');
-
-        $listResponse->assertOk();
-        $this->assertGreaterThan(0, count($listResponse->json('data')));
+        $this->assertSame('FACT-000001', $documentType->generateDocumentNumber($documentType));
+        $this->assertSame(2, (int) $documentType->fresh()->next_number);
     }
 }
