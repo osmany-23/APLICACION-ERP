@@ -2,6 +2,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { FiEdit2, FiPlus, FiSearch, FiTrash2, FiX } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { ApiError, apiRequest } from '../services/api';
+import { SwitchField } from '../components/SwitchField';
 
 type PaymentTerm = {
   id: number;
@@ -66,28 +67,6 @@ function Field({ label, children, error }: { label: string; children: React.Reac
       <span className="mb-2 block text-sm font-semibold text-black dark:text-white">{label}</span>
       {children}
       {error && <span className="mt-2 block text-xs font-semibold text-red-500">{error}</span>}
-    </label>
-  );
-}
-
-function SwitchField({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
-  return (
-    <label className="flex h-12 items-center justify-between gap-3 rounded-lg border border-stroke bg-white px-4 text-sm font-semibold text-black dark:border-strokedark dark:bg-boxdark dark:text-white">
-      <span>{label}</span>
-      <button
-        type="button"
-        onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-8 w-14 shrink-0 items-center rounded-full transition duration-200 ${
-          checked ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-500'
-        }`}
-      >
-        <span
-          className={`inline-block h-6 w-6 rounded-full bg-white transition duration-200 ${
-            checked ? 'translate-x-6' : 'translate-x-1'
-          }`}
-        />
-      </button>
-      <span className="text-sm font-medium text-slate-600 dark:text-slate-300">{checked ? 'Activo' : 'Inactivo'}</span>
     </label>
   );
 }

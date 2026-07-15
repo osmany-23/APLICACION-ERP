@@ -20,6 +20,7 @@ import {
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { ApiError, apiRequest } from '../services/api';
+import { SwitchField } from '../components/SwitchField';
 
 type CatalogType = 'brands' | 'categories' | 'subcategories' | 'units';
 
@@ -933,24 +934,11 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
               )}
 
               <div className="sm:col-span-2">
-                <Field label="Estado">
-                  <div className="flex items-center gap-3">
-                    <label className="inline-flex cursor-pointer items-center">
-                      <input
-                        type="checkbox"
-                        checked={draft.isActive}
-                        onChange={() => updateDraft('isActive', !draft.isActive)}
-                        className="peer sr-only"
-                      />
-                      <span className="relative h-7 w-14 rounded-full bg-red-500 transition peer-checked:bg-green-500">
-                        <span className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white transition peer-checked:translate-x-7" />
-                      </span>
-                    </label>
-                    <span className="text-sm font-semibold text-black dark:text-white">
-                      {draft.isActive ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </div>
-                </Field>
+                <SwitchField
+                  label="Estado"
+                  checked={draft.isActive}
+                  onChange={() => updateDraft('isActive', !draft.isActive)}
+                />
               </div>
 
               {config.hasLevel && (

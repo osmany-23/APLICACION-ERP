@@ -2,6 +2,7 @@ import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from 
 import { FiEdit2, FiPlus, FiRefreshCw, FiSearch, FiTrash2, FiX } from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, apiRequest } from '../../services/api';
+import { SwitchField } from '../../components/SwitchField';
 
 type GlobalCatalogType = 'currencies' | 'payment-terms' | 'payment-methods';
 
@@ -446,10 +447,11 @@ function GlobalCatalogsPage({ catalog }: { catalog?: GlobalCatalogType }) {
               )}
 
               <Field label="Estado">
-                <select value={draft.isActive ? 'true' : 'false'} onChange={(event) => updateDraft('isActive', event.target.value === 'true')} className={selectClass}>
-                  <option value="true">Activo</option>
-                  <option value="false">Inactivo</option>
-                </select>
+                <SwitchField
+                  label="Estado"
+                  checked={draft.isActive}
+                  onChange={(checked) => updateDraft('isActive', checked)}
+                />
               </Field>
             </div>
 

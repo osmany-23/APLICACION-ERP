@@ -4,12 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\DocumentTypeRequest;
 use App\Models\DocumentType;
+use App\Traits\StatusUpdateable;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class DocumentTypeController extends Controller
 {
+    use StatusUpdateable;
     public function index(): JsonResponse
     {
         $items = DB::table('document_types')
@@ -92,6 +95,15 @@ class DocumentTypeController extends Controller
         }
 
         return response()->json(['message' => 'Tipo de documento eliminado correctamente.', 'deleted' => true]);
+    }
+
+    public function updateStatus(Request $request, int $id): JsonResponse
+    {
+        $this->ensureItemExists($id);
+        $validated = $this->validateStatusUpdate($request);
+        
+        $documentType = DocumentType::findOrFail($id);
+        return $this->changeStatus($documentType, $validated['status'], 'is_active');
     }
 
     private function ensureItemExists(int $id): void

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Traits\StatusUpdateable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -9,6 +10,7 @@ use Illuminate\Validation\Rule;
 
 class CurrencyController extends Controller
 {
+    use StatusUpdateable;
     public function index(): JsonResponse
     {
         $items = DB::table('currencies')
@@ -73,6 +75,28 @@ class CurrencyController extends Controller
         DB::table('currencies')->where('id', $id)->delete();
 
         return response()->json(['message' => 'Moneda eliminada correctamente.', 'deleted' => true]);
+    }
+
+    public function updateStatus(Request $request, int $id): JsonResponse
+    {
+        $this->ensureItemExists($id);
+        $validated = $this->validateStatusUpdate($request);
+        
+        DB::table('currencies')
+            ->where('id', $id)
+            ->update(['is_active' => $validated['status']]);
+
+        $currency = DB::table('currencies')->where('id', $id)->first();
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Estado actualizado correctamente.',
+            'data' => [
+                'id' => (int) $currency->id,
+                'is_active' => (bool) $currency->is_active,
+                'status_label' => $currency->is_active ? 'Activo' : 'Inactivo',
+            ],
+        ], 200);
     }
 
     private function ensureItemExists(int $id): void

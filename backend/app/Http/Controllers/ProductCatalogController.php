@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Traits\StatusUpdateable;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -10,6 +11,8 @@ use Illuminate\Validation\Rule;
 
 class ProductCatalogController extends Controller
 {
+    use StatusUpdateable;
+    
     private const CATALOGS = ['brands', 'categories', 'subcategories', 'units'];
 
     public function index(Request $request, string $catalog): JsonResponse
@@ -92,6 +95,41 @@ class ProductCatalogController extends Controller
             'message' => $this->deletedMessage($catalog),
             'deleted' => true,
         ]);
+    }
+
+    public function updateStatus(Request $request, string $catalog, int $id): JsonResponse
+    {
+        $this->ensureCatalog($catalog);
+        $companyId = (int) $request->user()->company_id;
+        $this->ensureItemExists($companyId, $catalog, $id);
+        
+        $validated = $this->validateStatusUpdate($request);
+
+        $table = match ($catalog) {
+            'brands' => 'brands',
+            'categories', 'subcategories' => 'categories',
+            'units' => 'units',
+        };
+
+        DB::table($table)
+            ->where('id', $id)
+            ->where('company_id', $companyId)
+            ->update(['is_active' => $validated['status']]);
+
+        $item = DB::table($table)
+            ->where('id', $id)
+            ->where('company_id', $companyId)
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Estado actualizado correctamente.',
+            'data' => [
+                'id' => (int) $item->id,
+                'is_active' => (bool) $item->is_active,
+                'status_label' => $item->is_active ? 'Activo' : 'Inactivo',
+            ],
+        ], 200);
     }
 
     private function brands(int $companyId)

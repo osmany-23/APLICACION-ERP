@@ -41,21 +41,25 @@ Route::middleware('erp.auth')->group(function () {
         Route::get('/currencies', [CurrencyController::class, 'index']);
         Route::post('/currencies', [CurrencyController::class, 'store']);
         Route::put('/currencies/{id}', [CurrencyController::class, 'update'])->whereNumber('id');
+        Route::patch('/currencies/{id}/status', [CurrencyController::class, 'updateStatus'])->whereNumber('id');
         Route::delete('/currencies/{id}', [CurrencyController::class, 'destroy'])->whereNumber('id');
 
         Route::get('/payment-terms', [PaymentTermController::class, 'index']);
         Route::post('/payment-terms', [PaymentTermController::class, 'store']);
         Route::put('/payment-terms/{id}', [PaymentTermController::class, 'update'])->whereNumber('id');
+        Route::patch('/payment-terms/{id}/status', [PaymentTermController::class, 'updateStatus'])->whereNumber('id');
         Route::delete('/payment-terms/{id}', [PaymentTermController::class, 'destroy'])->whereNumber('id');
 
         Route::get('/payment-methods', [PaymentMethodController::class, 'index']);
         Route::post('/payment-methods', [PaymentMethodController::class, 'store']);
         Route::put('/payment-methods/{id}', [PaymentMethodController::class, 'update'])->whereNumber('id');
+        Route::patch('/payment-methods/{id}/status', [PaymentMethodController::class, 'updateStatus'])->whereNumber('id');
         Route::delete('/payment-methods/{id}', [PaymentMethodController::class, 'destroy'])->whereNumber('id');
 
         Route::get('/document-types', [DocumentTypeController::class, 'index']);
         Route::post('/document-types', [DocumentTypeController::class, 'store']);
         Route::put('/document-types/{id}', [DocumentTypeController::class, 'update'])->whereNumber('id');
+        Route::patch('/document-types/{id}/status', [DocumentTypeController::class, 'updateStatus'])->whereNumber('id');
         Route::delete('/document-types/{id}', [DocumentTypeController::class, 'destroy'])->whereNumber('id');
     });
 
@@ -66,6 +70,7 @@ Route::middleware('erp.auth')->group(function () {
             Route::get('/', 'index');
             Route::post('/', 'store');
             Route::put('/{id}', 'update')->whereNumber('id');
+            Route::patch('/{id}/status', 'updateStatus')->whereNumber('id');
             Route::delete('/{id}', 'destroy')->whereNumber('id');
         });
 
@@ -76,6 +81,7 @@ Route::middleware('erp.auth')->group(function () {
             Route::get('/', 'index');
             Route::post('/', 'store');
             Route::put('/{id}', 'update')->whereNumber('id');
+            Route::patch('/{id}/status', 'updateStatus')->whereNumber('id');
             Route::delete('/{id}', 'destroy')->whereNumber('id');
         });
 
@@ -83,4 +89,6 @@ Route::middleware('erp.auth')->group(function () {
         ->whereNumber('product');
     Route::apiResource('products', ProductController::class)
         ->only(['index', 'show', 'store', 'update', 'destroy']);
+    Route::patch('/products/{product}/status', [ProductController::class, 'updateStatus'])
+        ->whereNumber('product');
 });

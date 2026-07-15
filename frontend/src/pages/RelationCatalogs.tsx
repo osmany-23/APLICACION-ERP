@@ -22,6 +22,7 @@ import {
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { ApiError, apiRequest } from '../services/api';
+import { SwitchField } from '../components/SwitchField';
 
 type RelationType = 'suppliers' | 'warehouses' | 'branches' | 'companies';
 
@@ -92,7 +93,7 @@ type RelationDraft = {
   creditLimit: string;
   creditDays: string;
   notes: string;
-  status: 'Activo' | 'Inactivo';
+  status: boolean;
   currencyId: string;
   branchId: string;
   managerName: string;
@@ -164,7 +165,7 @@ const emptyDraft: RelationDraft = {
   creditLimit: '',
   creditDays: '',
   notes: '',
-  status: 'Activo',
+  status: true,
   currencyId: '',
   branchId: '',
   managerName: '',
@@ -292,7 +293,7 @@ function draftFromItem(item: RelationItem): RelationDraft {
     creditLimit: item.credit_limit ? String(item.credit_limit) : '',
     creditDays: item.credit_days ? String(item.credit_days) : '',
     notes: item.notes || '',
-    status: normalizeStatus(item.status ?? 1),
+    status: (item.status === 1 || item.status === '1' || item.status === true || item.status === 'Activo'),
     currencyId: item.currency_id ? String(item.currency_id) : '',
     branchId: item.branch_id ? String(item.branch_id) : '',
     managerName: item.manager_name || '',
@@ -421,10 +422,10 @@ function RelationCatalogs({ relation }: { relation: RelationType }) {
           ? 6
           : 6;
 
-  function updateDraft(field: keyof RelationDraft, value: string) {
+  function updateDraft(field: keyof RelationDraft, value: string | boolean) {
     setDraft((currentDraft) => ({
       ...currentDraft,
-      [field]: value,
+      [field]: field === 'status' ? (typeof value === 'boolean' ? value : value === 'true') : value,
     }));
   }
 
@@ -1185,21 +1186,11 @@ function RelationCatalogs({ relation }: { relation: RelationType }) {
               {(relation === 'suppliers' ||
                 relation === 'branches' ||
                 relation === 'companies') && (
-                <Field label="Estado">
-                  <select
-                    value={draft.status}
-                    onChange={(event) =>
-                      updateDraft(
-                        'status',
-                        normalizeStatus(event.target.value),
-                      )
-                    }
-                    className={selectClass}
-                  >
-                    <option>Activo</option>
-                    <option>Inactivo</option>
-                  </select>
-                </Field>
+                <SwitchField
+                  label="Estado"
+                  checked={draft.status}
+                  onChange={(checked) => updateDraft('status', checked)}
+                />
               )}
 
               <div className="md:col-span-2">

@@ -2,6 +2,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { FiEdit2, FiPlus, FiSearch, FiTrash2, FiX } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { ApiError, apiRequest } from '../services/api';
+import { SwitchField } from '../components/SwitchField';
 
 type DocumentType = {
   id: number;
@@ -335,23 +336,11 @@ export default function DocumentTypesPage() {
                 </Field>
               </div>
               <div className="md:col-span-2">
-                <div className="rounded-xl border border-stroke bg-slate-50 p-4 dark:border-strokedark dark:bg-boxdark/60">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-semibold text-black dark:text-white">Estado</p>
-                      <p className="text-sm text-slate-500">Activa o desactiva este tipo de documento.</p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={form.is_active}
-                      onClick={() => updateForm('is_active', !form.is_active)}
-                      className={`relative inline-flex h-7 w-14 items-center rounded-full transition ${form.is_active ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-600'}`}
-                    >
-                      <span className={`inline-block h-6 w-6 transform rounded-full bg-white shadow transition ${form.is_active ? 'translate-x-7' : 'translate-x-1'}`} />
-                    </button>
-                  </div>
-                </div>
+                <SwitchField
+                  label="Estado"
+                  checked={form.is_active}
+                  onChange={(checked) => updateForm('is_active', checked)}
+                />
               </div>
             </div>
 

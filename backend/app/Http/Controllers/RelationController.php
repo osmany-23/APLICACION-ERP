@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Traits\StatusUpdateable;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -11,6 +12,8 @@ use Illuminate\Validation\Rule;
 
 class RelationController extends Controller
 {
+    use StatusUpdateable;
+    
     private const RELATIONS = ['suppliers', 'warehouses', 'branches', 'companies'];
 
     public function index(Request $request, string $relation): JsonResponse
@@ -95,6 +98,42 @@ class RelationController extends Controller
             'message' => $this->deletedMessage($relation),
             'deleted' => true,
         ]);
+    }
+
+    public function updateStatus(Request $request, string $relation, int $id): JsonResponse
+    {
+        $this->ensureRelation($relation);
+        $companyId = (int) $request->user()->company_id;
+        $this->ensureItemExists($companyId, $relation, $id);
+        
+        $validated = $this->validateStatusUpdate($request);
+
+        $table = match ($relation) {
+            'suppliers' => 'suppliers',
+            'warehouses' => 'warehouses',
+            'branches' => 'branches',
+            'companies' => 'companies',
+        };
+
+        DB::table($table)
+            ->where('id', $id)
+            ->where('company_id', $companyId)
+            ->update(['status' => $validated['status']]);
+
+        $item = DB::table($table)
+            ->where('id', $id)
+            ->where('company_id', $companyId)
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Estado actualizado correctamente.',
+            'data' => [
+                'id' => (int) $item->id,
+                'status' => (bool) $item->status,
+                'status_label' => $item->status ? 'Activo' : 'Inactivo',
+            ],
+        ], 200);
     }
 
     private function suppliers(int $companyId)

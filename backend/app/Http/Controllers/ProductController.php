@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Traits\StatusUpdateable;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -11,6 +12,8 @@ use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
 {
+    use StatusUpdateable;
+    
     private const INVENTORY_STATUSES = [
         'RECEIVED' => 'Recibido',
         'PENDING_RECEIPT' => 'Pendiente por recibir',
@@ -222,6 +225,44 @@ class ProductController extends Controller
                 'deleted' => false,
             ]);
         }
+    }
+
+    public function updateStatus(Request $request, int $product): JsonResponse
+    {
+        $this->authorizeProducts($request);
+        $user = $this->authenticatedUser($request);
+        $companyId = (int) $user->company_id;
+        $validated = $this->validateStatusUpdate($request);
+
+        $existing = $this->findProductRecord($companyId, $product);
+
+        DB::table('products')
+            ->where('id', $product)
+            ->where('company_id', $companyId)
+            ->update([
+                'status' => $validated['status'] ? 1 : 0,
+                'updated_by' => $user->id,
+                'updated_at' => now(),
+            ]);
+
+        $item = DB::table('products')
+            ->where('id', $product)
+            ->where('company_id', $companyId)
+            ->first();
+
+        $this->writeAudit($request, 'UPDATE', $product, (array) $existing, [
+            'status' => $validated['status'] ? 1 : 0,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Estado actualizado correctamente.',
+            'data' => [
+                'id' => (int) $item->id,
+                'status' => (bool) $item->status,
+                'status_label' => $item->status ? 'Activo' : 'Inactivo',
+            ],
+        ], 200);
     }
 
     public function movements(Request $request, int $product): JsonResponse
