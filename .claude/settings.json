@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php -l database/seeders/GeneralSettingsSeeder.php)",
+      "Bash(php -r ' *)",
+      "Bash(php -l tests/Feature/CustomerControllerTest.php)",
+      "Bash(php -l tests/Feature/SaleControllerTest.php)",
+      "Bash(php -l tests/Feature/ProductControllerTest.php)",
+      "Bash(php -l tests/Feature/RelationControllerTest.php)",
+      "Bash(npm run *)",
+      "Bash(curl -s -X POST http://127.0.0.1:8000/api/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"admin\",\"password\":\"admin123\",\"remember\":false}')",
+      "Bash(tee /tmp/login.json)",
+      "Bash(ls -la /tmp/ 2>&1 | head -5; echo \"---\"; cat /tmp/login.json 2>&1 | head -c 200; echo; echo \"--- pwd ---\"; pwd; echo \"--- which php ---\"; which php)",
+      "Read(//tmp/**)",
+      "Bash(cd /tmp)",
+      "Bash(curl -s -X POST http://127.0.0.1:8000/api/relations/suppliers -H 'Authorization: Bearer __TRACKED_VAR__' -H 'Content-Type: application/json' -d '{\"name\":\"Proveedor Demo\",\"status\":1}')",
+      "Bash(curl -s -X POST http://127.0.0.1:8000/api/catalogs/categories -H 'Authorization: Bearer __TRACKED_VAR__' -H 'Content-Type: application/json' -d '{\"name\":\"General\",\"is_active\":true}')",
+      "Bash(curl -s -X POST http://127.0.0.1:8000/api/catalogs/brands -H 'Authorization: Bearer __TRACKED_VAR__' -H 'Content-Type: application/json' -d '{\"name\":\"Generica\",\"is_active\":true}')",
+      "Bash(curl -s -X POST http://127.0.0.1:8000/api/catalogs/units -H 'Authorization: Bearer __TRACKED_VAR__' -H 'Content-Type: application/json' -d '{\"name\":\"Unidad\",\"short_name\":\"UND\",\"category\":\"UNIDAD\",\"is_active\":true}')",
+      "Bash(curl -s -X POST http://127.0.0.1:8000/api/products -H 'Authorization: Bearer __TRACKED_VAR__' -H 'Content-Type: application/json' -d '{ *)",
+      "Bash(tee product_create.json)",
+      "Bash(curl -s http://127.0.0.1:8000/api/products/1/movements -H 'Authorization: Bearer __TRACKED_VAR__')",
+      "Bash(curl -s -X POST http://127.0.0.1:8000/api/customers -H 'Authorization: Bearer __TRACKED_VAR__' -H 'Content-Type: application/json' -d '{ *)",
+      "Bash(tee customer_create.json)",
+      "Bash(curl -s http://127.0.0.1:8000/api/settings/payment-terms -H 'Authorization: Bearer __TRACKED_VAR__')",
+      "Bash(curl -s -X POST http://127.0.0.1:8000/api/sales -H 'Authorization: Bearer __TRACKED_VAR__' -H 'Content-Type: application/json' -d '{ *)",
+      "Bash(tee sale_create.json)",
+      "Bash(curl -s -X POST http://127.0.0.1:8000/api/settings/payment-methods -H 'Authorization: Bearer __TRACKED_VAR__' -H 'Content-Type: application/json' -d '{\"code\":\"CASH\",\"name\":\"Efectivo\",\"type\":\"CASH\",\"cash\":true,\"is_active\":true}')",
+      "Bash(curl -s -w '\\\\nHTTP_STATUS:%{http_code}\\\\n' -X POST http://127.0.0.1:8000/api/sales -H 'Authorization: Bearer __TRACKED_VAR__' -H 'Content-Type: application/json' -d '{ *)",
+      "Bash(curl -s -i -X POST http://127.0.0.1:8000/api/settings/payment-methods -H 'Authorization: Bearer __TRACKED_VAR__' -H 'Accept: application/json' -H 'Content-Type: application/json' -d '{\"code\":\"CASH\",\"name\":\"Efectivo\",\"type\":\"CASH\",\"cash\":true,\"is_active\":true}')",
+      "Bash(curl -s -i -X POST http://127.0.0.1:8000/api/sales -H 'Authorization: Bearer __TRACKED_VAR__' -H 'Accept: application/json' -H 'Content-Type: application/json' -d '{ *)",
+      "Bash(curl -s -X POST http://127.0.0.1:8000/api/sales -H 'Authorization: Bearer __TRACKED_VAR__' -H 'Accept: application/json' -H 'Content-Type: application/json' -d '{ *)",
+      "Bash(curl -s http://127.0.0.1:8000/api/products/1/movements -H 'Authorization: Bearer __TRACKED_VAR__' -H 'Accept: application/json')"
+    ]
+  }
+}

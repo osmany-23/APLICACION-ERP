@@ -3,12 +3,15 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CurrencyController;
 use App\Http\Controllers\DocumentTypeController;
-use App\Http\Controllers\GlobalCatalogController;
+use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\GeneralSettingsController;
 use App\Http\Controllers\PaymentMethodController;
 use App\Http\Controllers\PaymentTermController;
 use App\Http\Controllers\ProductCatalogController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\RelationController;
+use App\Http\Controllers\SaleController;
 use Illuminate\Support\Facades\Route;
 
 Route::options('/{any}', fn () => response()->noContent())->where('any', '.*');
@@ -27,17 +30,23 @@ Route::prefix('auth')->group(function () {
     });
 });
 
+Route::get('/public/branding', [GeneralSettingsController::class, 'publicBranding']);
+
 Route::middleware('erp.auth')->group(function () {
     Route::get('/relations/suppliers/payment-terms', [RelationController::class, 'paymentTerms']);
 
-    Route::prefix('global-catalogs')->group(function () {
-        Route::get('/{catalog}', [GlobalCatalogController::class, 'index']);
-        Route::post('/{catalog}', [GlobalCatalogController::class, 'store']);
-        Route::put('/{catalog}/{id}', [GlobalCatalogController::class, 'update'])->whereNumber('id');
-        Route::delete('/{catalog}/{id}', [GlobalCatalogController::class, 'destroy'])->whereNumber('id');
-    });
-
     Route::prefix('settings')->group(function () {
+        Route::get('/general', [GeneralSettingsController::class, 'index']);
+        Route::put('/general', [GeneralSettingsController::class, 'update']);
+        Route::post('/general/logos', [GeneralSettingsController::class, 'uploadLogos']);
+        Route::put('/general/currency', [GeneralSettingsController::class, 'updateCurrency']);
+        Route::put('/general/headquarters', [GeneralSettingsController::class, 'updateHeadquarters']);
+        Route::post('/general/exchange-rates', [GeneralSettingsController::class, 'storeExchangeRate']);
+        Route::get('/general/exchange-rates/latest', [GeneralSettingsController::class, 'latestExchangeRate']);
+        Route::post('/general/mail/test', [GeneralSettingsController::class, 'testMail']);
+        Route::post('/general/backup/create', [GeneralSettingsController::class, 'createBackup']);
+        Route::post('/general/backup/restore', [GeneralSettingsController::class, 'restoreBackup']);
+
         Route::get('/currencies', [CurrencyController::class, 'index']);
         Route::post('/currencies', [CurrencyController::class, 'store']);
         Route::put('/currencies/{id}', [CurrencyController::class, 'update'])->whereNumber('id');
@@ -91,4 +100,37 @@ Route::middleware('erp.auth')->group(function () {
         ->only(['index', 'show', 'store', 'update', 'destroy']);
     Route::patch('/products/{product}/status', [ProductController::class, 'updateStatus'])
         ->whereNumber('product');
+
+    Route::prefix('customers')
+        ->controller(CustomerController::class)
+        ->group(function () {
+            Route::get('/', 'index');
+            Route::get('/{id}', 'show')->whereNumber('id');
+            Route::post('/', 'store');
+            Route::put('/{id}', 'update')->whereNumber('id');
+            Route::patch('/{id}/status', 'updateStatus')->whereNumber('id');
+            Route::delete('/{id}', 'destroy')->whereNumber('id');
+        });
+
+    Route::prefix('sales')
+        ->controller(SaleController::class)
+        ->group(function () {
+            Route::get('/', 'index');
+            Route::get('/{sale}', 'show')->whereNumber('sale');
+            Route::post('/', 'store');
+            Route::put('/{sale}', 'update')->whereNumber('sale');
+            Route::post('/{sale}/confirm', 'confirm')->whereNumber('sale');
+            Route::post('/{sale}/cancel', 'cancel')->whereNumber('sale');
+        });
+
+    Route::prefix('purchases')
+        ->controller(PurchaseController::class)
+        ->group(function () {
+            Route::get('/', 'index');
+            Route::get('/{purchase}', 'show')->whereNumber('purchase');
+            Route::post('/', 'store');
+            Route::put('/{purchase}', 'update')->whereNumber('purchase');
+            Route::post('/{purchase}/confirm', 'confirm')->whereNumber('purchase');
+            Route::post('/{purchase}/cancel', 'cancel')->whereNumber('purchase');
+        });
 });

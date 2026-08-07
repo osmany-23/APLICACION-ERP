@@ -33,9 +33,23 @@ class SecuritySeeder extends Seeder
         );
 
         // 2. Permisos Expandidos por Módulos
-        $modules = ['inventario', 'facturacion', 'compras', 'contabilidad', 'usuarios', 'productos', 'products'];
-        $actions = ['ver', 'crear', 'editar', 'eliminar', 'index', 'store', 'update', 'destroy', 'manage', 'administrar'];
-        
+        $modules = [
+            'inventario',
+            'facturacion',
+            'clientes',
+            'compras',
+            'contabilidad',
+            'usuarios',
+            'productos',
+            'products',
+            'settings',
+            'general_settings',
+            'global_catalogs',
+            'payment_methods',
+            'payment_terms',
+        ];
+        $actions = ['ver', 'crear', 'editar', 'eliminar', 'view', 'index', 'store', 'update', 'destroy', 'status', 'manage', 'administrar'];
+
         $permissionIds = [];
 
         foreach ($modules as $module) {
@@ -61,6 +75,28 @@ class SecuritySeeder extends Seeder
         foreach (array_unique($permissionIds) as $permId) {
             DB::table('role_permissions')->insert([
                 'role_id' => $adminRoleId,
+                'permission_id' => $permId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        // 3b. Asignar permisos limitados al rol Vendedor: puede operar
+        // facturación, clientes y productos, pero no eliminar ni administrar.
+        $vendedorRoleId = DB::table('roles')->where('company_id', $company->id)->where('name', 'Vendedor')->value('id');
+        $vendedorModules = ['facturacion', 'clientes', 'productos', 'products', 'inventario'];
+        $vendedorActions = ['ver', 'crear', 'editar', 'view', 'index', 'store', 'update'];
+
+        DB::table('role_permissions')->where('role_id', $vendedorRoleId)->delete();
+
+        $vendedorPermissionIds = DB::table('permissions')
+            ->whereIn('module_name', $vendedorModules)
+            ->whereIn('action_name', $vendedorActions)
+            ->pluck('id');
+
+        foreach ($vendedorPermissionIds->unique() as $permId) {
+            DB::table('role_permissions')->insert([
+                'role_id' => $vendedorRoleId,
                 'permission_id' => $permId,
                 'created_at' => now(),
                 'updated_at' => now(),

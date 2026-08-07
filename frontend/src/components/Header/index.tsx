@@ -2,13 +2,15 @@ import { Link } from 'react-router-dom';
 import DropdownMessage from './DropdownMessage';
 import DropdownNotification from './DropdownNotification';
 import DropdownUser from './DropdownUser';
-import LogoIcon from '../../images/logo/logo-icon.svg';
 import DarkModeSwitcher from './DarkModeSwitcher';
+import { useBranding } from '../../context/BrandingContext';
 
 const Header = (props: {
   sidebarOpen: string | boolean | undefined;
   setSidebarOpen: (arg0: boolean) => void;
 }) => {
+  const { branding, initials, logoUrl, loginLogoUrl } = useBranding();
+
   return (
     <header className="sticky top-0 z-999 flex w-full bg-white drop-shadow-1 dark:bg-boxdark dark:drop-shadow-none">
       <div className="flex flex-grow items-center justify-between px-4 py-4 shadow-2 md:px-6 2xl:px-11">
@@ -57,7 +59,17 @@ const Header = (props: {
           {/* <!-- Hamburger Toggle BTN --> */}
 
           <Link className="block flex-shrink-0 lg:hidden" to="/">
-            <img src={LogoIcon} alt="Logo" />
+            {logoUrl || loginLogoUrl ? (
+              <img
+                src={logoUrl || loginLogoUrl || ''}
+                alt={branding.company_name}
+                className="h-9 w-auto max-w-32 object-contain"
+              />
+            ) : (
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-xs font-black text-white">
+                {initials}
+              </span>
+            )}
           </Link>
         </div>
 
@@ -104,7 +116,7 @@ const Header = (props: {
             {/* <!-- Dark Mode Toggler --> */}
 
             {/* <!-- Notification Menu Area --> */}
-            <DropdownNotification />
+            {branding.notifications_enabled !== false && <DropdownNotification />}
             {/* <!-- Notification Menu Area --> */}
 
             {/* <!-- Chat Notification Area --> */}

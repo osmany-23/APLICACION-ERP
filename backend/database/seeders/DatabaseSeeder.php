@@ -13,7 +13,9 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             ErpBaseSeeder::class,
+            GeneralSettingsSeeder::class,
             SecuritySeeder::class,
+            AccountingAccountsSeeder::class,
         ]);
     }
 }

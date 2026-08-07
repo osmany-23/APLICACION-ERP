@@ -12,13 +12,20 @@ import ECommerce from './pages/Dashboard/ECommerce';
 import FormElements from './pages/Form/FormElements';
 import FormLayout from './pages/Form/FormLayout';
 import CurrenciesPage from './pages/CurrenciesPage';
+import CustomersPage from './pages/Customers';
 import DocumentTypesPage from './pages/DocumentTypesPage';
 import PaymentMethodsPage from './pages/PaymentMethodsPage';
 import PaymentTermsPage from './pages/PaymentTermsPage';
 import ProductCatalogs from './pages/ProductCatalogs';
 import Products from './pages/Products';
 import Profile from './pages/Profile';
+import PurchasesPage from './pages/Purchases';
+import PurchaseForm from './pages/Purchases/PurchaseForm';
+import PurchaseDetail from './pages/Purchases/PurchaseDetail';
 import RelationCatalogs from './pages/RelationCatalogs';
+import SalesPage from './pages/Sales';
+import SaleForm from './pages/Sales/SaleForm';
+import SaleDetail from './pages/Sales/SaleDetail';
 import Settings from './pages/Settings';
 import Tables from './pages/Tables';
 import Alerts from './pages/UiElements/Alerts';
@@ -89,6 +96,69 @@ function ProtectedAppRoutes() {
               <>
                 <PageTitle title="Unidades | Sistema ERP" />
                 <ProductCatalogs catalog="units" />
+              </>
+            }
+          />
+          <Route
+            path="/customers"
+            element={
+              <>
+                <PageTitle title="Clientes | Sistema ERP" />
+                <CustomersPage />
+              </>
+            }
+          />
+          <Route
+            path="/sales"
+            element={
+              <>
+                <PageTitle title="Facturacion | Sistema ERP" />
+                <SalesPage />
+              </>
+            }
+          />
+          <Route
+            path="/sales/new"
+            element={
+              <>
+                <PageTitle title="Nueva Factura | Sistema ERP" />
+                <SaleForm />
+              </>
+            }
+          />
+          <Route
+            path="/sales/:id"
+            element={
+              <>
+                <PageTitle title="Detalle de Factura | Sistema ERP" />
+                <SaleDetail />
+              </>
+            }
+          />
+          <Route
+            path="/purchases"
+            element={
+              <>
+                <PageTitle title="Compras | Sistema ERP" />
+                <PurchasesPage />
+              </>
+            }
+          />
+          <Route
+            path="/purchases/new"
+            element={
+              <>
+                <PageTitle title="Nueva Compra | Sistema ERP" />
+                <PurchaseForm />
+              </>
+            }
+          />
+          <Route
+            path="/purchases/:id"
+            element={
+              <>
+                <PageTitle title="Detalle de Compra | Sistema ERP" />
+                <PurchaseDetail />
               </>
             }
           />

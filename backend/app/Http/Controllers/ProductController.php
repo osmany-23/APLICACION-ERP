@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\CompanySettingsService;
 use App\Traits\StatusUpdateable;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -273,6 +274,7 @@ class ProductController extends Controller
 
         $movements = DB::table('inventory_movements')
             ->leftJoin('warehouses', 'warehouses.id', '=', 'inventory_movements.warehouse_id')
+            ->leftJoin('inventory_lots', 'inventory_lots.id', '=', 'inventory_movements.lot_id')
             ->where('inventory_movements.company_id', $companyId)
             ->where('inventory_movements.product_id', $product)
             ->orderByDesc('inventory_movements.movement_date')
@@ -281,12 +283,11 @@ class ProductController extends Controller
             ->get([
                 'inventory_movements.id',
                 'inventory_movements.movement_type',
-                'inventory_movements.inventory_status',
                 'inventory_movements.reference_table',
                 'inventory_movements.quantity',
                 'inventory_movements.stock_after',
-                'inventory_movements.lot_number',
-                'inventory_movements.expiration_date',
+                'inventory_lots.lot_number as lot_number',
+                'inventory_lots.expiration_date as expiration_date',
                 'inventory_movements.movement_date',
                 'inventory_movements.created_at',
                 'warehouses.name as warehouse_name',
@@ -294,12 +295,9 @@ class ProductController extends Controller
             ->map(function ($movement) {
                 $quantity = (float) ($movement->quantity ?? 0);
                 $type = (string) ($movement->movement_type ?? '');
-                $isOutput = $type === 'EXIT' || ($type === 'ADJUSTMENT' && $quantity < 0);
+                $isOutput = in_array($type, ['SALE_EXIT', 'TRANSFER_OUT', 'RETURN_OUT'], true)
+                    || ($type === 'ADJUSTMENT' && $quantity < 0);
                 $detail = $this->movementLabel($type);
-
-                if ($movement->inventory_status) {
-                    $detail .= ' - '.(self::INVENTORY_STATUSES[$movement->inventory_status] ?? $movement->inventory_status);
-                }
 
                 if ($movement->lot_number) {
                     $detail .= ' - Lote '.$movement->lot_number;
@@ -748,7 +746,6 @@ class ProductController extends Controller
             'warehouse_id' => $warehouseId,
             'product_id' => $productId,
             'movement_type' => $movementType,
-            'inventory_status' => $validated['inventory_status'] ?? 'RECEIVED',
             'reference_table' => 'products',
             'reference_id' => $productId,
             'quantity' => $quantity,
@@ -756,8 +753,6 @@ class ProductController extends Controller
             'total_cost' => $quantity * $unitCost,
             'stock_before' => $stockBefore,
             'stock_after' => $stockAfter,
-            'lot_number' => $this->nullableText($validated['lot_number'] ?? null),
-            'expiration_date' => $this->nullableText($validated['expiration_date'] ?? null),
             'movement_date' => now(),
             'created_by' => $userId,
             'created_at' => now(),
@@ -899,6 +894,12 @@ class ProductController extends Controller
 
     private function writeAudit(Request $request, string $action, int $recordId, ?array $oldValues, ?array $newValues): void
     {
+        $companyId = (int) ($request->user()?->company_id ?? 0);
+
+        if ($companyId > 0 && ! (bool) app(CompanySettingsService::class)->get($companyId, 'system', 'audit_enabled', true)) {
+            return;
+        }
+
         DB::table('audit_logs')->insert([
             'user_id' => $request->user()?->id,
             'table_name' => 'products',
@@ -915,8 +916,8 @@ class ProductController extends Controller
     private function stockSql(): string
     {
         return "COALESCE(SUM(CASE
-            WHEN movement_type IN ('INITIAL_INVENTORY', 'ENTRY') THEN COALESCE(quantity, 0)
-            WHEN movement_type = 'EXIT' THEN -COALESCE(quantity, 0)
+            WHEN movement_type IN ('INITIAL_INVENTORY', 'PURCHASE_ENTRY', 'TRANSFER_IN', 'RETURN_IN') THEN COALESCE(quantity, 0)
+            WHEN movement_type IN ('SALE_EXIT', 'TRANSFER_OUT', 'RETURN_OUT') THEN -COALESCE(quantity, 0)
             WHEN movement_type = 'ADJUSTMENT' THEN COALESCE(quantity, 0)
             ELSE 0
         END), 0)";
@@ -926,10 +927,13 @@ class ProductController extends Controller
     {
         return match ($type) {
             'INITIAL_INVENTORY' => 'Inventario inicial',
-            'ENTRY' => 'Entrada',
-            'EXIT' => 'Salida',
-            'TRANSFER' => 'Transferencia',
+            'PURCHASE_ENTRY' => 'Entrada por compra',
+            'SALE_EXIT' => 'Salida por venta',
+            'TRANSFER_IN' => 'Entrada por transferencia',
+            'TRANSFER_OUT' => 'Salida por transferencia',
             'ADJUSTMENT' => 'Ajuste',
+            'RETURN_IN' => 'Entrada por devolucion',
+            'RETURN_OUT' => 'Salida por devolucion',
             default => 'Movimiento',
         };
     }

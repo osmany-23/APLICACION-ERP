@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\CompanySettingsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -14,36 +15,53 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    public function __construct(private readonly CompanySettingsService $settings)
+    {
+    }
+
     public function login(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'username' => ['required', 'string', 'min:3', 'max:120', 'regex:/^[A-Za-z0-9._@-]+$/'],
-            'password' => ['required', 'string', 'min:8', 'max:255'],
+            'password' => ['required', 'string', 'max:255'],
             'remember' => ['sometimes', 'boolean'],
         ], [
             'username.required' => 'Ingresa tu usuario o correo.',
             'username.min' => 'El usuario debe tener al menos 3 caracteres.',
             'username.regex' => 'El usuario solo puede contener letras, numeros, punto, guion, guion bajo o @.',
             'password.required' => 'Ingresa tu contrasena.',
-            'password.min' => 'La contrasena debe tener al menos 8 caracteres.',
         ]);
-
-        $throttleKey = $this->throttleKey($request, $validated['username']);
-
-        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
-            return response()->json([
-                'message' => 'Demasiados intentos. Intenta nuevamente en unos segundos.',
-                'retry_after' => RateLimiter::availableIn($throttleKey),
-            ], 429);
-        }
 
         $user = User::query()
             ->where('username', $validated['username'])
             ->orWhere('email', $validated['username'])
             ->first();
 
+        $security = $this->securitySettings($user);
+        $passwordMinLength = (int) ($security['password_min_length'] ?? 8);
+
+        if (strlen($validated['password']) < $passwordMinLength) {
+            throw ValidationException::withMessages([
+                'password' => ['La contrasena debe tener al menos '.$passwordMinLength.' caracteres.'],
+            ]);
+        }
+
+        $throttleKey = $this->throttleKey($request, $validated['username']);
+        $lockoutEnabled = (bool) ($security['lockout_enabled'] ?? true);
+        $maxAttempts = (int) ($security['max_login_attempts'] ?? 5);
+        $lockoutSeconds = max(60, (int) ($security['lockout_minutes'] ?? 15) * 60);
+
+        if ($lockoutEnabled && RateLimiter::tooManyAttempts($throttleKey, $maxAttempts)) {
+            return response()->json([
+                'message' => 'Demasiados intentos. Intenta nuevamente en unos segundos.',
+                'retry_after' => RateLimiter::availableIn($throttleKey),
+            ], 429);
+        }
+
         if (! $user || ! Hash::check($validated['password'], $user->password_hash)) {
-            RateLimiter::hit($throttleKey, 900);
+            if ($lockoutEnabled) {
+                RateLimiter::hit($throttleKey, $lockoutSeconds);
+            }
 
             throw ValidationException::withMessages([
                 'username' => ['Las credenciales no coinciden con nuestros registros.'],
@@ -61,7 +79,7 @@ class AuthController extends Controller
         $plainToken = Str::random(80);
         $expiresAt = $validated['remember'] ?? false
             ? now()->addDays(30)
-            : now()->addHours(12);
+            : now()->addMinutes((int) ($security['session_timeout_minutes'] ?? 720));
 
         DB::table('user_api_tokens')->insert([
             'user_id' => $user->id,
@@ -76,17 +94,19 @@ class AuthController extends Controller
 
         $user->forceFill(['last_login' => now()])->save();
 
-        DB::table('audit_logs')->insert([
-            'user_id' => $user->id,
-            'table_name' => 'users',
-            'action_type' => 'LOGIN',
-            'record_id' => $user->id,
-            'old_values' => null,
-            'new_values' => json_encode(['username' => $user->username]),
-            'ip_address' => $request->ip(),
-            'user_agent' => Str::limit((string) $request->userAgent(), 1000, ''),
-            'created_at' => now(),
-        ]);
+        if ($this->auditEnabled((int) $user->company_id)) {
+            DB::table('audit_logs')->insert([
+                'user_id' => $user->id,
+                'table_name' => 'users',
+                'action_type' => 'LOGIN',
+                'record_id' => $user->id,
+                'old_values' => null,
+                'new_values' => json_encode(['username' => $user->username]),
+                'ip_address' => $request->ip(),
+                'user_agent' => Str::limit((string) $request->userAgent(), 1000, ''),
+                'created_at' => now(),
+            ]);
+        }
 
         return response()->json([
             'message' => 'Sesion iniciada correctamente.',
@@ -125,6 +145,26 @@ class AuthController extends Controller
     private function throttleKey(Request $request, string $username): string
     {
         return Str::lower($username).'|'.$request->ip();
+    }
+
+    private function securitySettings(?User $user): array
+    {
+        if ($user && $user->company_id) {
+            return $this->settings->all((int) $user->company_id)['security'] ?? [];
+        }
+
+        $companyId = DB::table('companies')->orderBy('id')->value('id');
+
+        if (! $companyId) {
+            return [];
+        }
+
+        return $this->settings->all((int) $companyId)['security'] ?? [];
+    }
+
+    private function auditEnabled(int $companyId): bool
+    {
+        return (bool) $this->settings->get($companyId, 'system', 'audit_enabled', true);
     }
 
     private function userPayload(User $user): array

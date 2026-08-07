@@ -7,6 +7,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -656,6 +657,10 @@ class RelationController extends Controller
 
     private function countRows(string $table, string $field, int $id, ?int $companyId = null): int
     {
+        if (! Schema::hasTable($table) || ! Schema::hasColumn($table, $field)) {
+            return 0;
+        }
+
         $query = DB::table($table)->where($field, $id);
 
         if ($companyId !== null) {

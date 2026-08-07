@@ -45,6 +45,7 @@ class AuthenticateApiToken
         Auth::setUser($user);
         $request->setUserResolver(fn () => $user);
         $request->attributes->set('api_token_id', $token->id);
+        $this->applyCompanyTimezone((int) $user->company_id);
 
         return $next($request);
     }
@@ -54,5 +55,19 @@ class AuthenticateApiToken
         return response()->json([
             'message' => 'No autenticado.',
         ], 401);
+    }
+
+    private function applyCompanyTimezone(int $companyId): void
+    {
+        $timezone = DB::table('companies')
+            ->where('id', $companyId)
+            ->value('timezone');
+
+        if (! $timezone) {
+            return;
+        }
+
+        config(['app.timezone' => $timezone]);
+        date_default_timezone_set((string) $timezone);
     }
 }

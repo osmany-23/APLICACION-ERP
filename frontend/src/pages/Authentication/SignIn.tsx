@@ -12,13 +12,17 @@ import {
   FiUser,
 } from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
+import { useBranding } from '../../context/BrandingContext';
 import { ApiError } from '../../services/api';
 import CoverImage from '../../images/icon/fondo.jpg';
-import CompanyLogo from '../../images/icon/logo.png';
-import CompanyLogoClaro from '../../images/icon/logo_claro.png';
 import InventoryImage from '../../images/icon/cubo.png';
 import InvoiceImage from '../../images/icon/hoja-de-balance.png';
 import CalculatorImage from '../../images/icon/grafico-de-barras.png';
+// Logo del proveedor del sistema (Sigma Enterprise). Es fijo/permanente en
+// el panel izquierdo del login: a diferencia del logo de la empresa cliente
+// (panel derecho, configurable desde Configuracion), este NO viene de
+// BrandingContext ni se puede cambiar desde la UI.
+import SigmaEnterpriseLogo from '../../images/logo/sigma-enterprise-logo.png';
 
 type FormState = {
   username: string;
@@ -55,6 +59,7 @@ const SignIn = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
+  const { branding, initials, loginLogoUrl, logoUrl } = useBranding();
   const [form, setForm] = useState<FormState>({
     username: '',
     password: '',
@@ -156,11 +161,11 @@ const SignIn = () => {
           />
           <div className="absolute inset-0 bg-[#0F172A]/85" />
           <div className="relative flex h-full flex-col justify-center p-6 lg:p-8 xl:p-10">
-            <div className="mb-2 flex justify-center">
+            <div className="mb-6 flex justify-center">
               <img
-                src={CompanyLogo}
-                alt="SIGMA ERP"
-                className="h-24 w-auto scale-[4]"
+                src={SigmaEnterpriseLogo}
+                alt="Sigma Enterprise"
+                className="h-60 w-auto object-contain drop-shadow-lg"
               />
             </div>
 
@@ -298,12 +303,22 @@ const SignIn = () => {
         <section className="flex w-full items-center justify-center p-6 sm:p-8 lg:w-1/2 lg:p-8">
           <div className="w-full max-w-md">
             <div className="mb-4 flex flex-col items-center justify-center text-center">
-              <img src={CompanyLogoClaro} alt="Fermeci" className="mb-2 h-16 w-auto object-contain scale-[1]" />
+              {loginLogoUrl || logoUrl ? (
+                <img
+                  src={loginLogoUrl || logoUrl || ''}
+                  alt={branding.company_name}
+                  className="mb-2 h-16 w-auto object-contain"
+                />
+              ) : (
+                <span className="mb-2 flex h-16 w-16 items-center justify-center rounded-xl bg-[#0078D4]/10 text-xl font-black text-[#0078D4] dark:bg-[#0078D4]/20">
+                  {initials}
+                </span>
+              )}
               <h2 className="mt-2 text-2xl font-bold text-[#334155] dark:text-white">
                 Iniciar Sesion
               </h2>
               <p className="mt-2 text-sm font-semibold text-[#334155] dark:text-bodydark">
-                Biembenido a <span className="text-[#0078D4]">Ferreteria Fermeci</span>
+                Bienvenido a <span className="text-[#0078D4]">{branding.commercial_name}</span>
               </p>
             </div>
 

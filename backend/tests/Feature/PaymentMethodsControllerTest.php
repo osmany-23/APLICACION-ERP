@@ -33,6 +33,14 @@ class PaymentMethodsControllerTest extends TestCase
             'updated_at' => now(),
         ]);
 
+        $roleId = DB::table('roles')->insertGetId([
+            'company_id' => $companyId,
+            'name' => 'Administrador',
+            'description' => 'Acceso completo a pruebas.',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
         $userId = DB::table('users')->insertGetId([
             'company_id' => $companyId,
             'uuid' => (string) Str::uuid(),
@@ -40,6 +48,7 @@ class PaymentMethodsControllerTest extends TestCase
             'password_hash' => bcrypt('password'),
             'full_name' => 'Payment User',
             'email' => 'payment@example.com',
+            'role_id' => $roleId,
             'status' => 1,
             'created_at' => now(),
             'updated_at' => now(),
