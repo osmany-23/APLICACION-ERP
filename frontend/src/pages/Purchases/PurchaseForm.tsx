@@ -245,7 +245,7 @@ export default function PurchaseForm() {
           <label className="block">
             <span className="mb-2 block text-sm font-semibold text-black dark:text-white">Proveedor</span>
             <select value={supplierId} onChange={(event) => setSupplierId(event.target.value)} className={inputClass}>
-              <option value="">Selecciona un proveedor</option>
+              <option value="" disabled hidden>Selecciona un proveedor</option>
               {suppliers.map((supplier) => (
                 <option key={supplier.id} value={supplier.id}>
                   {supplier.code} - {supplier.name}
@@ -262,7 +262,7 @@ export default function PurchaseForm() {
           <label className="block">
             <span className="mb-2 block text-sm font-semibold text-black dark:text-white">Almacen de ingreso</span>
             <select value={warehouseId} onChange={(event) => setWarehouseId(event.target.value)} className={inputClass}>
-              <option value="">Selecciona un almacen</option>
+              <option value="" disabled hidden>Selecciona un almacen</option>
               {warehouses.map((warehouse) => (
                 <option key={warehouse.id} value={warehouse.id}>
                   {warehouse.name}
@@ -318,7 +318,7 @@ export default function PurchaseForm() {
           <label className="block flex-1">
             <span className="mb-2 block text-sm font-semibold text-black dark:text-white">Producto</span>
             <select value={selectedProductId} onChange={(event) => setSelectedProductId(event.target.value)} className={inputClass}>
-              <option value="">Selecciona un producto</option>
+              <option value="" disabled hidden>Selecciona un producto</option>
               {products.map((product) => (
                 <option key={product.id} value={product.id}>
                   {product.code} - {product.name} (Stock: {product.stock})

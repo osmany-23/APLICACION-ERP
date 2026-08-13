@@ -170,11 +170,8 @@ const SignIn = () => {
             </div>
 
             <div className="max-w-xl">
-              <h1
-                className="mb-2 text-3xl font-bold leading-tight text-white xl:text-4xl"
-                style={{ fontFamily: "'Montserrat', sans-serif" }}
-              >
-                Una plataforma ERP <br /><span className="text-[#00A1FF]">completa para tu empresa</span>
+              <h1 className="mb-2 text-3xl font-black leading-tight tracking-tight text-white xl:text-4xl">
+                Una plataforma ERP <br /><span className="bg-gradient-to-r from-[#5B93FF] to-[#7C6FF0] bg-clip-text text-transparent">completa para tu empresa</span>
               </h1>
               <div className="relative min-h-[60px] sm:min-h-[50px]">
                 <AnimatePresence mode="wait">
@@ -241,7 +238,7 @@ const SignIn = () => {
                         animate={{ rotate: 360 }}
                         transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
                         style={{ x: '-50%', y: '-50%' }}
-                        className="absolute top-1/2 left-1/2 h-[250%] w-[250%] bg-[conic-gradient(from_0deg,transparent_40%,#0078D4_50%,#40A9FF_55%,transparent_65%)]"
+                        className="absolute top-1/2 left-1/2 h-[250%] w-[250%] bg-[conic-gradient(from_0deg,transparent_40%,#155EEF_50%,#7C6FF0_55%,transparent_65%)]"
                       />
                     </motion.div>
 
@@ -288,7 +285,7 @@ const SignIn = () => {
               </div>
 
               <div className="mt-6 flex items-center gap-4 rounded-xl border border-white/10 bg-[#FFFFFF]/5 p-4 backdrop-blur-md">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#00A1FF]/20 text-[#00A1FF]">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#5B93FF]/20 text-[#5B93FF]">
                   <FiShield size={24} />
                 </div>
                 <div>
@@ -310,7 +307,7 @@ const SignIn = () => {
                   className="mb-2 h-16 w-auto object-contain"
                 />
               ) : (
-                <span className="mb-2 flex h-16 w-16 items-center justify-center rounded-xl bg-[#0078D4]/10 text-xl font-black text-[#0078D4] dark:bg-[#0078D4]/20">
+                <span className="mb-2 flex h-16 w-16 items-center justify-center rounded-xl bg-[#155EEF]/10 text-xl font-black text-[#155EEF] dark:bg-[#155EEF]/20">
                   {initials}
                 </span>
               )}
@@ -318,13 +315,13 @@ const SignIn = () => {
                 Iniciar Sesion
               </h2>
               <p className="mt-2 text-sm font-semibold text-[#334155] dark:text-bodydark">
-                Bienvenido a <span className="text-[#0078D4]">{branding.commercial_name}</span>
+                Bienvenido a <span className="text-[#155EEF]">{branding.commercial_name}</span>
               </p>
             </div>
 
             <div className="w-full">
               {errors.form && (
-                <div className="mb-4 flex gap-2 rounded-md border border-[#DC2626]/20 bg-[#DC2626]/5 px-3 py-2 text-xs text-[#DC2626] dark:border-[#DC2626]/40 dark:bg-[#DC2626]/10 dark:text-red-200">
+                <div className="mb-4 flex gap-2 rounded-md border border-[#F04438]/20 bg-[#F04438]/5 px-3 py-2 text-xs text-[#F04438] dark:border-[#F04438]/40 dark:bg-[#F04438]/10 dark:text-red-200">
                   <FiAlertCircle className="mt-0.5 shrink-0" />
                   <span>{errors.form}</span>
                 </div>
@@ -350,14 +347,14 @@ const SignIn = () => {
                       placeholder="Ingrese correo electrónico"
                       autoComplete="username"
                       aria-invalid={Boolean(errors.username)}
-                      className={`w-full rounded-xl border bg-transparent py-2.5 pl-11 pr-4 text-sm text-[#334155] outline-none transition focus:border-[#0078D4] dark:bg-form-input dark:text-white ${errors.username
-                        ? 'border-[#DC2626]'
+                      className={`w-full rounded-xl border bg-transparent py-2.5 pl-11 pr-4 text-sm text-[#334155] outline-none transition focus:border-[#155EEF] dark:bg-form-input dark:text-white ${errors.username
+                        ? 'border-[#F04438]'
                         : 'border-stroke dark:border-form-strokedark'
                         }`}
                     />
                   </div>
                   {errors.username && (
-                    <p className="mt-2 text-sm text-[#DC2626]">
+                    <p className="mt-2 text-sm text-[#F04438]">
                       {errors.username}
                     </p>
                   )}
@@ -382,15 +379,15 @@ const SignIn = () => {
                       placeholder="Introducir la contraseña"
                       autoComplete="current-password"
                       aria-invalid={Boolean(errors.password)}
-                      className={`w-full rounded-xl border bg-transparent py-2.5 pl-11 pr-12 text-sm text-[#334155] outline-none transition focus:border-[#0078D4] dark:bg-form-input dark:text-white ${errors.password
-                        ? 'border-[#DC2626]'
+                      className={`w-full rounded-xl border bg-transparent py-2.5 pl-11 pr-12 text-sm text-[#334155] outline-none transition focus:border-[#155EEF] dark:bg-form-input dark:text-white ${errors.password
+                        ? 'border-[#F04438]'
                         : 'border-stroke dark:border-form-strokedark'
                         }`}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword((visible) => !visible)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-[#0078D4]"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-[#155EEF]"
                       aria-label={
                         showPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'
                       }
@@ -400,19 +397,19 @@ const SignIn = () => {
                   </div>
                   <div className="mt-1.5 flex items-center justify-between gap-3 text-xs">
                     {errors.password ? (
-                      <p className="text-[#DC2626]">
+                      <p className="text-[#F04438]">
                         {errors.password}
                       </p>
                     ) : (
                       <p className="flex items-center gap-1.5 text-slate-500 dark:text-bodydark">
                         {passwordReady && (
-                          <FiCheckCircle className="text-[#16A34A]" />
+                          <FiCheckCircle className="text-[#12B76A]" />
                         )}
                         Validacion local activa
                       </p>
                     )}
                     {lockSeconds > 0 && (
-                      <span className="font-medium text-[#F59E0B]">
+                      <span className="font-medium text-[#F79009]">
                         {lockSeconds}s
                       </span>
                     )}
@@ -427,11 +424,11 @@ const SignIn = () => {
                       onChange={(event) =>
                         updateField('remember', event.target.checked)
                       }
-                      className="h-4 w-4 rounded border-stroke text-[#0078D4] focus:ring-[#0078D4] dark:border-strokedark"
+                      className="h-4 w-4 rounded border-stroke text-[#155EEF] focus:ring-[#155EEF] dark:border-strokedark"
                     />
                     Recordarme
                   </label>
-                  <a href="#" className="text-[13px] font-medium text-[#0078D4] hover:underline">
+                  <a href="#" className="text-[13px] font-medium text-[#155EEF] hover:underline">
                     Has olvidado tu contraseña ?
                   </a>
                 </div>
@@ -439,14 +436,14 @@ const SignIn = () => {
                 <button
                   type="submit"
                   disabled={!canSubmit}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#0078D4] bg-[#0078D4] px-4 py-3 text-[15px] font-medium text-white transition hover:bg-[#0078D4]/90 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#155EEF] bg-[#155EEF] px-4 py-3 text-[15px] font-medium text-white transition hover:bg-[#155EEF]/90 disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   {submitting && <FiLoader className="animate-spin" />}
                   {lockSeconds > 0 ? 'Espera para intentar' : 'Acceso \u2192'}
                 </button>
 
                 <div className="mt-4 flex items-center justify-center gap-2 text-[13px] text-slate-500">
-                  <FiShield className="text-[#0078D4]" />
+                  <FiShield className="text-[#155EEF]" />
                   Seguro, rápido y confiable
                 </div>
               </form>

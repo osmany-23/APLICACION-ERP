@@ -12,8 +12,8 @@ const Header = (props: {
   const { branding, initials, logoUrl, loginLogoUrl } = useBranding();
 
   return (
-    <header className="sticky top-0 z-999 flex w-full bg-white drop-shadow-1 dark:bg-boxdark dark:drop-shadow-none">
-      <div className="flex flex-grow items-center justify-between px-4 py-4 shadow-2 md:px-6 2xl:px-11">
+    <header className="sticky top-0 z-999 flex w-full border-b border-stroke bg-white/90 backdrop-blur dark:border-strokedark dark:bg-boxdark/90">
+      <div className="flex flex-grow items-center justify-between px-4 py-3.5 md:px-6 2xl:px-11">
         <div className="flex items-center gap-2 sm:gap-4 lg:hidden">
           {/* <!-- Hamburger Toggle BTN --> */}
           <button
@@ -74,13 +74,20 @@ const Header = (props: {
         </div>
 
         <div className="hidden sm:block">
-          <form action="https://formbold.com/s/unique_form_id" method="POST">
+          {/* Nota: sin `action`/onSubmit real todavia (no hay busqueda global
+              implementada); se previene el submit para que Enter no navegue
+              fuera de la SPA. */}
+          <form onSubmit={(event) => event.preventDefault()}>
             <div className="relative">
-              <button className="absolute left-0 top-1/2 -translate-y-1/2">
+              <button
+                type="submit"
+                className="absolute left-3.5 top-1/2 -translate-y-1/2"
+                aria-label="Buscar"
+              >
                 <svg
-                  className="fill-body hover:fill-primary dark:fill-bodydark dark:hover:fill-primary"
-                  width="20"
-                  height="20"
+                  className="fill-bodydark2 dark:fill-bodydark"
+                  width="18"
+                  height="18"
                   viewBox="0 0 20 20"
                   fill="none"
                   xmlns="http://www.w3.org/2000/svg"
@@ -102,8 +109,8 @@ const Header = (props: {
 
               <input
                 type="text"
-                placeholder="Type to search..."
-                className="w-full bg-transparent pl-9 pr-4 text-black focus:outline-none dark:text-white xl:w-125"
+                placeholder="Buscar en el sistema..."
+                className="w-full rounded-lg border border-transparent bg-gray py-2.5 pl-10 pr-4 text-sm text-black transition-colors placeholder:text-bodydark2 focus:border-primary/40 focus:bg-white focus:outline-none dark:bg-meta-4 dark:text-white dark:placeholder:text-bodydark dark:focus:bg-boxdark-2 xl:w-100"
               />
             </div>
           </form>

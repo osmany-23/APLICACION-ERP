@@ -36,6 +36,10 @@ export type Sale = {
   paid_amount: number;
   balance_due: number;
   is_credit: boolean;
+  created_by?: number | null;
+  created_by_name?: string | null;
+  salesperson_id?: number | null;
+  salesperson_name?: string | null;
   warehouse_id?: number | null;
   branch_id?: number | null;
   payment_method_id?: number | null;

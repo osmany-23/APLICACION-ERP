@@ -16,6 +16,7 @@ class DatabaseSeeder extends Seeder
             GeneralSettingsSeeder::class,
             SecuritySeeder::class,
             AccountingAccountsSeeder::class,
+            EmployeeDemoSeeder::class,
         ]);
     }
 }

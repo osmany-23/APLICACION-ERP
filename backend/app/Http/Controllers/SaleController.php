@@ -21,7 +21,7 @@ class SaleController extends Controller
         $companyId = (int) $request->user()->company_id;
 
         $query = Sale::query()
-            ->with('customer:id,full_name,code')
+            ->with(['customer:id,full_name,code', 'salesperson:id,full_name', 'createdBy:id,full_name'])
             ->where('company_id', $companyId)
             ->orderByDesc('sale_date')
             ->orderByDesc('id');
@@ -150,6 +150,7 @@ class SaleController extends Controller
             'sale_date' => ['nullable', 'date'],
             'confirm' => ['sometimes', 'boolean'],
             'override_credit_limit' => ['sometimes', 'boolean'],
+            'salesperson_id' => ['nullable', 'integer'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer'],
@@ -182,6 +183,10 @@ class SaleController extends Controller
             'paid_amount' => (float) $sale->paid_amount,
             'balance_due' => (float) $sale->balance_due,
             'is_credit' => $sale->payment_method_id === null,
+            'created_by' => $sale->created_by,
+            'created_by_name' => $sale->createdBy?->full_name,
+            'salesperson_id' => $sale->salesperson_id,
+            'salesperson_name' => $sale->salesperson?->full_name,
         ];
     }
 
@@ -227,7 +232,7 @@ class SaleController extends Controller
     private function findSale(int $companyId, int $id): Sale
     {
         $sale = Sale::query()
-            ->with(['items.taxes', 'customer:id,full_name,code'])
+            ->with(['items.taxes', 'customer:id,full_name,code', 'salesperson:id,full_name', 'createdBy:id,full_name'])
             ->where('company_id', $companyId)
             ->where('id', $id)
             ->first();

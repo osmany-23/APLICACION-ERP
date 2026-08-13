@@ -1,17 +1,25 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CountryController;
 use App\Http\Controllers\CurrencyController;
+use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DocumentTypeController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\GeneralSettingsController;
 use App\Http\Controllers\PaymentMethodController;
 use App\Http\Controllers\PaymentTermController;
+use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\PosPinController;
+use App\Http\Controllers\PositionController;
 use App\Http\Controllers\ProductCatalogController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\RelationController;
+use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SaleController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::options('/{any}', fn () => response()->noContent())->where('any', '.*');
@@ -26,6 +34,8 @@ Route::prefix('auth')->group(function () {
 
     Route::middleware('erp.auth')->group(function () {
         Route::get('/me', [AuthController::class, 'me']);
+        Route::put('/me', [AuthController::class, 'updateProfile']);
+        Route::post('/change-password', [AuthController::class, 'changePassword']);
         Route::post('/logout', [AuthController::class, 'logout']);
     });
 });
@@ -133,4 +143,65 @@ Route::middleware('erp.auth')->group(function () {
             Route::post('/{purchase}/confirm', 'confirm')->whereNumber('purchase');
             Route::post('/{purchase}/cancel', 'cancel')->whereNumber('purchase');
         });
+
+    // Administracion: Usuarios / Roles / Permisos.
+    Route::prefix('users')
+        ->controller(UserController::class)
+        ->group(function () {
+            Route::get('/', 'index');
+            Route::get('/{id}', 'show')->whereNumber('id');
+            Route::post('/', 'store');
+            Route::put('/{id}', 'update')->whereNumber('id');
+            Route::patch('/{id}/status', 'updateStatus')->whereNumber('id');
+            Route::post('/{id}/reset-password', 'resetPassword')->whereNumber('id');
+            Route::post('/{id}/pin', 'generatePin')->whereNumber('id');
+            Route::delete('/{id}/pin', 'revokePin')->whereNumber('id');
+        });
+
+    Route::prefix('roles')
+        ->controller(RoleController::class)
+        ->group(function () {
+            Route::get('/', 'index');
+            Route::get('/{id}', 'show')->whereNumber('id');
+            Route::post('/', 'store');
+            Route::put('/{id}', 'update')->whereNumber('id');
+            Route::put('/{id}/permissions', 'syncPermissions')->whereNumber('id');
+            Route::delete('/{id}', 'destroy')->whereNumber('id');
+        });
+
+    Route::get('/permissions', [PermissionController::class, 'index']);
+    Route::get('/countries', [CountryController::class, 'index']);
+
+    // Empleados, cargos y departamentos.
+    Route::prefix('employees')
+        ->controller(EmployeeController::class)
+        ->group(function () {
+            Route::get('/', 'index');
+            Route::get('/{id}', 'show')->whereNumber('id');
+            Route::post('/', 'store');
+            Route::put('/{id}', 'update')->whereNumber('id');
+            Route::delete('/{id}', 'destroy')->whereNumber('id');
+        });
+
+    Route::prefix('departments')
+        ->controller(DepartmentController::class)
+        ->group(function () {
+            Route::get('/', 'index');
+            Route::post('/', 'store');
+            Route::put('/{id}', 'update')->whereNumber('id');
+            Route::patch('/{id}/status', 'updateStatus')->whereNumber('id');
+            Route::delete('/{id}', 'destroy')->whereNumber('id');
+        });
+
+    Route::prefix('positions')
+        ->controller(PositionController::class)
+        ->group(function () {
+            Route::get('/', 'index');
+            Route::post('/', 'store');
+            Route::put('/{id}', 'update')->whereNumber('id');
+            Route::patch('/{id}/status', 'updateStatus')->whereNumber('id');
+            Route::delete('/{id}', 'destroy')->whereNumber('id');
+        });
+
+    Route::post('/pos/pin/resolve', [PosPinController::class, 'resolve']);
 });

@@ -136,14 +136,20 @@ interface SwitchFieldProps {
   ariaLabel?: string;
 }
 
-export function SwitchField({ 
-  checked, 
-  onChange, 
+export function SwitchField({
+  checked,
+  onChange,
   disabled = false,
   label,
   ariaLabel
 }: SwitchFieldProps) {
-  return <StatusSwitch checked={checked} onChange={onChange} disabled={disabled} ariaLabel={ariaLabel || label || 'Estado'} />;
+  // Nota: solo el switch, sin la etiqueta "Activo/Inactivo" repetida debajo.
+  // El significado ya lo da el contexto externo (encabezado de columna en
+  // tablas, o el <label> del campo en los modales) — mostrar ambos era
+  // redundante en toda la app. Ademas, StatusSwitch mostraba siempre el
+  // texto fijo "Activo/Inactivo" sin importar el `label` recibido, lo cual
+  // era enganoso en switches que no son de estado (ej. "Requiere referencia").
+  return <StatusSwitchInline checked={checked} onChange={onChange} disabled={disabled} ariaLabel={ariaLabel || label || 'Estado'} />;
 }
 
 export default StatusSwitch;

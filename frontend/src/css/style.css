@@ -3,8 +3,54 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    /* Suavizado de fuente + tabular numbers por defecto: los reportes y
+     * tablas del ERP se ven mucho mas prolijos cuando las cifras alinean. */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'tnum' 1, 'cv11' 1;
+  }
+
   body {
-    @apply font-satoshi font-normal text-base text-body bg-whiten relative z-1;
+    @apply font-satoshi font-normal text-base text-body bg-whiten relative z-1 antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply tracking-tight text-black dark:text-white;
+  }
+
+  /* Foco visible consistente en toda la app (accesible y con la identidad
+   * de marca), en vez del contorno azul por defecto del navegador. */
+  :focus-visible {
+    outline: 2px solid #155eef;
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* Scrollbar fina y discreta, coherente en claro/oscuro. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+  }
+  .dark * {
+    scrollbar-color: #334155 transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;
+    border-radius: 9999px;
+  }
+  .dark *::-webkit-scrollbar-thumb {
+    background-color: #334155;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: #94a3b8;
   }
 }
 
@@ -157,13 +203,13 @@ span.flatpickr-weekday,
 .flatpickr-day.selected.nextMonthDay,
 .flatpickr-day.startRange.nextMonthDay,
 .flatpickr-day.endRange.nextMonthDay {
-  background: #3c50e0;
+  background: #155eef;
   @apply !border-primary !bg-primary hover:!border-primary hover:!bg-primary;
 }
 .flatpickr-day.selected.startRange + .endRange:not(:nth-child(7n + 1)),
 .flatpickr-day.startRange.startRange + .endRange:not(:nth-child(7n + 1)),
 .flatpickr-day.endRange.startRange + .endRange:not(:nth-child(7n + 1)) {
-  box-shadow: -10px 0 0 #3c50e0;
+  box-shadow: -10px 0 0 #155eef;
 }
 
 .map-btn .jvm-zoom-btn {

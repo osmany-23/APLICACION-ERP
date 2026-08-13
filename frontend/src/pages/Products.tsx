@@ -22,6 +22,7 @@ import {
   FiEdit2,
   FiEye,
   FiFilePlus,
+  FiFilter,
   FiImage,
   FiPackage,
   FiPlus,
@@ -35,6 +36,8 @@ import {
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { ApiError, apiRequest } from '../services/api';
+import { SwitchField } from '../components/SwitchField';
+import ActionsMenu from '../components/ActionsMenu';
 
 type ProductStatus = 'Activo' | 'Inactivo';
 type DialogMode = 'create' | 'edit' | 'details' | 'kardex' | null;
@@ -807,6 +810,13 @@ const Products = () => {
   const [categoryFilter, setCategoryFilter] = useState('Todas');
   const [brandFilter, setBrandFilter] = useState('Todas');
   const [unitFilter, setUnitFilter] = useState('Todas');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const activeFilterCount = [
+    statusFilter !== 'Todos',
+    categoryFilter !== 'Todas',
+    brandFilter !== 'Todas',
+    unitFilter !== 'Todas',
+  ].filter(Boolean).length;
   const [supplierFilter, setSupplierFilter] = useState('Todos');
   const [warehouseFilter, setWarehouseFilter] = useState('Todos');
   const [currentPage, setCurrentPage] = useState(1);
@@ -845,6 +855,24 @@ const Products = () => {
       setLoadingProducts(false);
     }
   }, [token]);
+
+  async function handleToggleStatus(product: ProductRecord) {
+    if (!token) return;
+
+    try {
+      await apiRequest(
+        `/products/${product.id}/status`,
+        { method: 'PATCH', body: JSON.stringify({ status: product.status !== 'Activo' }) },
+        token,
+      );
+      await loadProducts();
+    } catch (toggleError) {
+      // El backend responde 422 con un mensaje claro cuando el producto
+      // esta en una venta/compra abierta (DRAFT/PENDING) y no se puede
+      // desactivar hasta finalizar o anular esa transaccion.
+      setPageError(getErrorMessage(toggleError));
+    }
+  }
 
   const loadCatalogs = useCallback(async () => {
     if (!token) {
@@ -1746,18 +1774,33 @@ const Products = () => {
 
       <div className="rounded-lg border border-stroke bg-white p-5 shadow-default dark:border-strokedark dark:bg-boxdark md:p-7">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div className="relative w-full xl:max-w-md">
-            <FiSearch className="absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
-            <input
-              type="search"
-              value={searchTerm}
-              onChange={(event) => {
-                setSearchTerm(event.target.value);
-                setCurrentPage(1);
-              }}
-              placeholder="Buscar productos..."
-              className="h-13 w-full rounded-lg border border-stroke bg-white pl-14 pr-4 text-base text-black outline-none transition focus:border-primary dark:border-strokedark dark:bg-boxdark dark:text-white"
-            />
+          <div className="flex w-full items-center gap-3 xl:max-w-lg">
+            <div className="relative w-full">
+              <FiSearch className="absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+              <input
+                type="search"
+                value={searchTerm}
+                onChange={(event) => {
+                  setSearchTerm(event.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="Buscar productos..."
+                className="h-13 w-full rounded-lg border border-stroke bg-white pl-14 pr-4 text-base text-black outline-none transition focus:border-primary dark:border-strokedark dark:bg-boxdark dark:text-white"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(true)}
+              title="Filtros"
+              className="relative inline-flex h-13 w-13 shrink-0 items-center justify-center rounded-lg border border-stroke bg-white text-slate-600 transition hover:border-primary hover:text-primary dark:border-strokedark dark:bg-boxdark dark:text-bodydark"
+            >
+              <FiFilter className="h-5 w-5" />
+              {activeFilterCount > 0 && (
+                <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] font-black text-white">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -1800,89 +1843,142 @@ const Products = () => {
           />
         </div>
 
-        <div className="mt-7 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-5">
-          <Field label="Estado">
-            <SelectWrap>
-              <select
-                value={statusFilter}
-                onChange={(event) => {
-                  setStatusFilter(event.target.value);
-                  setCurrentPage(1);
-                }}
-                className={selectClass}
-              >
-                <option>Todos</option>
-                <option>Activo</option>
-                <option>Inactivo</option>
-              </select>
-            </SelectWrap>
-          </Field>
-
-          <Field label="Categoria">
-            <SelectWrap>
-              <select
-                value={categoryFilter}
-                onChange={(event) => {
-                  setCategoryFilter(event.target.value);
-                  setCurrentPage(1);
-                }}
-                className={selectClass}
-              >
-                <option>Todas</option>
-                {categories.map((category) => (
-                  <option key={category}>{category}</option>
-                ))}
-              </select>
-            </SelectWrap>
-          </Field>
-
-          <Field label="Marca">
-            <SelectWrap>
-              <select
-                value={brandFilter}
-                onChange={(event) => {
-                  setBrandFilter(event.target.value);
-                  setCurrentPage(1);
-                }}
-                className={selectClass}
-              >
-                <option>Todas</option>
-                {brands.map((brand) => (
-                  <option key={brand}>{brand}</option>
-                ))}
-              </select>
-            </SelectWrap>
-          </Field>
-
-          <Field label="Unidad">
-            <SelectWrap>
-              <select
-                value={unitFilter}
-                onChange={(event) => {
-                  setUnitFilter(event.target.value);
-                  setCurrentPage(1);
-                }}
-                className={selectClass}
-              >
-                <option>Todas</option>
-                {units.map((unit) => (
-                  <option key={unit}>{unit}</option>
-                ))}
-              </select>
-            </SelectWrap>
-          </Field>
-
-          <div className="flex items-end">
-            <button
-              type="button"
-              onClick={handleClearFilters}
-              className="inline-flex h-12 w-full items-center justify-center gap-3 rounded-lg bg-primary px-5 text-sm font-bold text-white transition hover:bg-opacity-90"
-            >
-              <FiRefreshCw className="h-5 w-5" />
-              Limpiar filtros
+        {activeFilterCount > 0 && (
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-slate-500">Filtros activos:</span>
+            {statusFilter !== 'Todos' && (
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">Estado: {statusFilter}</span>
+            )}
+            {categoryFilter !== 'Todas' && (
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">Categoria: {categoryFilter}</span>
+            )}
+            {brandFilter !== 'Todas' && (
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">Marca: {brandFilter}</span>
+            )}
+            {unitFilter !== 'Todas' && (
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">Unidad: {unitFilter}</span>
+            )}
+            <button type="button" onClick={handleClearFilters} className="text-xs font-semibold text-red-500 hover:underline">
+              Limpiar todo
             </button>
           </div>
-        </div>
+        )}
+
+        {filtersOpen && (
+          <div className="fixed inset-0 z-99999 flex items-center justify-center bg-black/50 px-4 py-6">
+            <div className="w-full max-w-2xl rounded-lg border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark">
+              <div className="mb-6 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <FiFilter className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <p className="text-xl font-black text-black dark:text-white">Filtros</p>
+                    <p className="text-sm text-slate-500">Filtra la lista de productos por estado, categoria, marca o unidad.</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFiltersOpen(false)}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-stroke text-black hover:border-red-500 hover:text-red-500 dark:border-strokedark dark:text-white"
+                >
+                  <FiX className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <Field label="Estado">
+                  <SelectWrap>
+                    <select
+                      value={statusFilter}
+                      onChange={(event) => {
+                        setStatusFilter(event.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className={selectClass}
+                    >
+                      <option>Todos</option>
+                      <option>Activo</option>
+                      <option>Inactivo</option>
+                    </select>
+                  </SelectWrap>
+                </Field>
+
+                <Field label="Categoria">
+                  <SelectWrap>
+                    <select
+                      value={categoryFilter}
+                      onChange={(event) => {
+                        setCategoryFilter(event.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className={selectClass}
+                    >
+                      <option>Todas</option>
+                      {categories.map((category) => (
+                        <option key={category}>{category}</option>
+                      ))}
+                    </select>
+                  </SelectWrap>
+                </Field>
+
+                <Field label="Marca">
+                  <SelectWrap>
+                    <select
+                      value={brandFilter}
+                      onChange={(event) => {
+                        setBrandFilter(event.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className={selectClass}
+                    >
+                      <option>Todas</option>
+                      {brands.map((brand) => (
+                        <option key={brand}>{brand}</option>
+                      ))}
+                    </select>
+                  </SelectWrap>
+                </Field>
+
+                <Field label="Unidad">
+                  <SelectWrap>
+                    <select
+                      value={unitFilter}
+                      onChange={(event) => {
+                        setUnitFilter(event.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className={selectClass}
+                    >
+                      <option>Todas</option>
+                      {units.map((unit) => (
+                        <option key={unit}>{unit}</option>
+                      ))}
+                    </select>
+                  </SelectWrap>
+                </Field>
+              </div>
+
+              <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+                <button
+                  type="button"
+                  onClick={handleClearFilters}
+                  className="inline-flex h-12 items-center justify-center gap-3 rounded-lg border border-stroke px-5 text-sm font-bold text-black transition hover:border-primary hover:text-primary dark:border-strokedark dark:text-white"
+                >
+                  <FiRefreshCw className="h-5 w-5" />
+                  Limpiar filtros
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFiltersOpen(false)}
+                  className="inline-flex h-12 items-center justify-center rounded-lg bg-primary px-6 text-sm font-bold text-white transition hover:bg-opacity-90"
+                >
+                  Aplicar y cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="mt-7 overflow-x-auto rounded-lg border border-stroke dark:border-strokedark">
           <table className="w-full min-w-[1120px] table-auto">
@@ -1971,68 +2067,44 @@ const Products = () => {
                       {formatQuantity(product.stock)}
                     </td>
                     <td className="px-4 py-5">
-                      <span
-                        className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-black uppercase ${
-                          product.status === 'Activo'
-                            ? 'bg-[#DFF6E7] text-[#0F9F37]'
-                            : 'bg-red-50 text-red-500'
-                        }`}
-                      >
-                        <span
-                          className={`h-2.5 w-2.5 rounded-full ${
-                            product.status === 'Activo'
-                              ? 'bg-[#03A323]'
-                              : 'bg-red-500'
-                          }`}
-                        />
-                        {product.status}
-                      </span>
+                      <SwitchField
+                        checked={product.status === 'Activo'}
+                        onChange={() => void handleToggleStatus(product)}
+                        label="Estado"
+                      />
                     </td>
                     <td className="max-w-60 px-4 py-5 text-sm font-semibold text-black dark:text-white">
                       {product.description || product.model || 'Sin descripcion'}
                     </td>
                     <td className="px-4 py-5">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => void openProductDialog(product, 'details')}
+                      <div className="flex justify-center">
+                        <ActionsMenu
+                          ariaLabel={`Mas opciones de ${product.name}`}
                           disabled={actionProductId === product.id}
-                          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-primary text-primary transition hover:bg-primary hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-                          title="Ver detalles"
-                          aria-label={`Ver detalles de ${product.name}`}
-                        >
-                          <FiEye className="h-5 w-5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void openEditDialog(product)}
-                          disabled={actionProductId === product.id}
-                          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#16A34A] text-[#0F9F37] transition hover:bg-[#16A34A] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-                          title="Editar"
-                          aria-label={`Editar ${product.name}`}
-                        >
-                          <FiEdit2 className="h-5 w-5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void openProductDialog(product, 'kardex')}
-                          disabled={actionProductId === product.id}
-                          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#2563EB] text-[#2563EB] transition hover:bg-[#2563EB] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-                          title="Kardex"
-                          aria-label={`Kardex de ${product.name}`}
-                        >
-                          <FiBarChart2 className="h-5 w-5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void handleDelete(product)}
-                          disabled={actionProductId === product.id}
-                          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-red-500 text-red-500 transition hover:bg-red-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-                          title="Eliminar"
-                          aria-label={`Eliminar ${product.name}`}
-                        >
-                          <FiTrash2 className="h-5 w-5" />
-                        </button>
+                          items={[
+                            {
+                              label: 'Ver detalle',
+                              icon: FiEye,
+                              onClick: () => void openProductDialog(product, 'details'),
+                            },
+                            {
+                              label: 'Editar',
+                              icon: FiEdit2,
+                              onClick: () => void openEditDialog(product),
+                            },
+                            {
+                              label: 'Cardex',
+                              icon: FiBarChart2,
+                              onClick: () => void openProductDialog(product, 'kardex'),
+                            },
+                            {
+                              label: 'Eliminar',
+                              icon: FiTrash2,
+                              variant: 'danger',
+                              onClick: () => void handleDelete(product),
+                            },
+                          ]}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -2225,7 +2297,7 @@ const Products = () => {
                         className={selectClass}
                         disabled={loadingCatalogs}
                       >
-                        <option value="">Selecciona categoria</option>
+                        <option value="" disabled hidden>Selecciona categoria</option>
                         {catalogs.categories.map((category) => (
                           <option key={category.id} value={category.id}>
                             {category.name}
@@ -2261,7 +2333,7 @@ const Products = () => {
                         className={selectClass}
                         disabled={loadingCatalogs}
                       >
-                        <option value="">Selecciona marca</option>
+                        <option value="" disabled hidden>Selecciona marca</option>
                         {catalogs.brands.map((brand) => (
                           <option key={brand.id} value={brand.id}>
                             {brand.name}
@@ -2284,7 +2356,7 @@ const Products = () => {
                         className={selectClass}
                         disabled={loadingCatalogs}
                       >
-                        <option value="">Selecciona proveedor</option>
+                        <option value="" disabled hidden>Selecciona proveedor</option>
                         {catalogs.suppliers.map((supplier) => (
                           <option key={supplier.id} value={supplier.id}>
                             {supplier.name}
@@ -2294,21 +2366,13 @@ const Products = () => {
                     </SelectWrap>
                   </Field>
                   <Field label="Estado">
-                    <SelectWrap>
-                      <select
-                        value={draft.status}
-                        onChange={(event) =>
-                          updateDraft(
-                            'status',
-                            normalizeStatus(event.target.value),
-                          )
-                        }
-                        className={selectClass}
-                      >
-                        <option>Activo</option>
-                        <option>Inactivo</option>
-                      </select>
-                    </SelectWrap>
+                    <SwitchField
+                      checked={draft.status === 'Activo'}
+                      onChange={(checked) =>
+                        updateDraft('status', checked ? 'Activo' : 'Inactivo')
+                      }
+                      label="Estado"
+                    />
                   </Field>
                   <Field label="Imagen URL">
                     <input
@@ -2364,7 +2428,7 @@ const Products = () => {
                         className={selectClass}
                         disabled={loadingCatalogs}
                       >
-                        <option value="">Selecciona unidad</option>
+                        <option value="" disabled hidden>Selecciona unidad</option>
                         {catalogs.units.map((unit) => (
                           <option key={unit.id} value={unit.id}>
                             {unit.short_name
@@ -2389,7 +2453,7 @@ const Products = () => {
                         className={selectClass}
                         disabled={loadingCatalogs}
                       >
-                        <option value="">Selecciona unidad</option>
+                        <option value="" disabled hidden>Selecciona unidad</option>
                         {catalogs.units.map((unit) => (
                           <option key={unit.id} value={unit.id}>
                             {unit.short_name
@@ -2551,7 +2615,7 @@ const Products = () => {
                         className={selectClass}
                         disabled={loadingCatalogs}
                       >
-                        <option value="">Selecciona almacen</option>
+                        <option value="" disabled hidden>Selecciona almacen</option>
                         {availableWarehouses.map((warehouse) => (
                           <option key={warehouse.id} value={warehouse.id}>
                             {warehouse.name}

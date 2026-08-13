@@ -8,6 +8,7 @@ use App\Models\Customer;
 use App\Models\DocumentType;
 use App\Models\JournalEntry;
 use App\Models\Sale;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 class SalesService
@@ -70,6 +71,7 @@ class SalesService
                 'exchange_rate' => $exchangeRate,
                 'notes' => $payload['notes'] ?? null,
                 'created_by' => $userId,
+                'salesperson_id' => $this->resolveSalespersonId($companyId, $userId, $payload['salesperson_id'] ?? null),
             ]);
 
             foreach ($lines as $line) {
@@ -374,6 +376,27 @@ class SalesService
         abort_unless((int) $customer->status === 1, 422, 'El cliente seleccionado esta inactivo.');
 
         return $customer;
+    }
+
+    /**
+     * Si no se paso salesperson_id (flujo normal), la venta se atribuye al
+     * usuario logueado, igual que siempre. Si se paso (resuelto via PIN en
+     * PosPinController), se valida que pertenezca a la misma empresa antes
+     * de confiar en el — nunca se atribuye una venta a un usuario de otra
+     * empresa por un payload manipulado.
+     */
+    private function resolveSalespersonId(int $companyId, int $userId, mixed $rawSalespersonId): int
+    {
+        if ($rawSalespersonId === null || $rawSalespersonId === '') {
+            return $userId;
+        }
+
+        $salespersonId = (int) $rawSalespersonId;
+        $exists = User::query()->where('company_id', $companyId)->where('id', $salespersonId)->exists();
+
+        abort_unless($exists, 422, 'El vendedor indicado no es valido.');
+
+        return $salespersonId;
     }
 
     private function resolveWarehouse(int $companyId, int $warehouseId): object

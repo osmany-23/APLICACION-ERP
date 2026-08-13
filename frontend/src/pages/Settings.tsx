@@ -1428,7 +1428,7 @@ export default function Settings() {
                     onChange={(event) => updateCompany('country', event.target.value)}
                     className={selectClass}
                   >
-                    <option value="">Seleccionar</option>
+                    <option value="" disabled hidden>Seleccionar</option>
                     {(options?.countries ?? []).map((country) => (
                       <option key={country} value={country}>
                         {country}
@@ -1552,7 +1552,7 @@ export default function Settings() {
                   onChange={(event) => updateHeadquarters(event.target.value)}
                   className={selectClass}
                 >
-                  <option value="">Seleccionar</option>
+                  <option value="" disabled hidden>Seleccionar</option>
                   {branches.map((branch) => (
                     <option key={branch.id} value={branch.id}>
                       {branch.name}
@@ -1640,7 +1640,7 @@ export default function Settings() {
                   className={selectClass}
                   required
                 >
-                  <option value="">Seleccionar</option>
+                  <option value="" disabled hidden>Seleccionar</option>
                   {currencies.map((currency) => (
                     <option key={currency.id} value={currency.id}>
                       {currency.code} - {currency.name}

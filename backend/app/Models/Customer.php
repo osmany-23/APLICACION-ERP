@@ -18,9 +18,17 @@ class Customer extends Model
         'business_name',
         'tax_id',
         'tax_id_type',
+        'residency_type',
+        'gender',
+        'sales_type',
         'phone',
+        'phone_country_id',
+        'has_landline',
+        'landline_phone',
         'email',
         'address',
+        'country_id',
+        'city',
         'contact_person',
         'contact_phone',
         'contact_email',
@@ -29,6 +37,9 @@ class Customer extends Model
         'price_list_id',
         'credit_limit',
         'credit_days',
+        'applies_late_fee',
+        'late_fee_percentage',
+        'late_fee_period_unit',
         'discount_rate',
         'birthday',
         'latitude',
@@ -47,9 +58,14 @@ class Customer extends Model
         'currency_id' => 'integer',
         'price_list_id' => 'integer',
         'salesperson_id' => 'integer',
+        'country_id' => 'integer',
+        'phone_country_id' => 'integer',
+        'has_landline' => 'boolean',
         'credit_limit' => 'decimal:4',
         'credit_days' => 'integer',
         'current_balance' => 'decimal:4',
+        'applies_late_fee' => 'boolean',
+        'late_fee_percentage' => 'decimal:2',
         'discount_rate' => 'decimal:2',
         'birthday' => 'date',
         'latitude' => 'float',
@@ -71,6 +87,16 @@ class Customer extends Model
     public function currency(): BelongsTo
     {
         return $this->belongsTo(Currency::class);
+    }
+
+    public function country(): BelongsTo
+    {
+        return $this->belongsTo(Country::class);
+    }
+
+    public function phoneCountry(): BelongsTo
+    {
+        return $this->belongsTo(Country::class, 'phone_country_id');
     }
 
     public function sales(): HasMany

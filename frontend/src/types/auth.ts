@@ -36,6 +36,7 @@ export type AuthUser = {
   phone: string | null;
   status: number;
   last_login: string | null;
+  created_at: string | null;
   company: AuthCompany | null;
   branch: AuthBranch | null;
   role: AuthRole | null;

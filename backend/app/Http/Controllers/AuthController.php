@@ -127,6 +127,74 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * Autoservicio: cualquier usuario autenticado puede actualizar su propio
+     * nombre/correo/telefono. A diferencia de UserController::update(), esto
+     * NO exige el permiso "usuarios" (seria absurdo requerir permiso de
+     * administrar usuarios solo para corregir tu propio numero de telefono)
+     * y deliberadamente NO permite tocar username/role_id/status/company —
+     * eso sigue siendo exclusivo de un administrador.
+     */
+    public function updateProfile(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'full_name' => ['required', 'string', 'max:150'],
+            'email' => ['nullable', 'email', 'max:120'],
+            'phone' => ['nullable', 'string', 'max:30', 'regex:/^[0-9]{1,4}([\-\s][0-9]{1,4})*$/'],
+        ], [
+            'full_name.required' => 'Ingresa tu nombre completo.',
+            'phone.regex' => 'El telefono solo puede tener numeros, espacios y guiones.',
+        ]);
+
+        $user->update([
+            'full_name' => trim($validated['full_name']),
+            'email' => $validated['email'] ?? null,
+            'phone' => $validated['phone'] ?? null,
+        ]);
+
+        return response()->json([
+            'message' => 'Perfil actualizado correctamente.',
+            'user' => $this->userPayload($user->fresh()),
+        ]);
+    }
+
+    /**
+     * Autoservicio: cambiar tu propia contrasena, exigiendo la actual como
+     * confirmacion (no un simple "reset" de administrador). Reutiliza el
+     * mismo largo minimo configurado en Seguridad que ya valida el login.
+     */
+    public function changePassword(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $security = $this->securitySettings($user);
+        $passwordMinLength = (int) ($security['password_min_length'] ?? 8);
+
+        $validated = $request->validate([
+            'current_password' => ['required', 'string'],
+            'new_password' => ['required', 'string', "min:{$passwordMinLength}", 'confirmed'],
+        ], [
+            'current_password.required' => 'Ingresa tu contrasena actual.',
+            'new_password.required' => 'Ingresa la nueva contrasena.',
+            'new_password.min' => "La nueva contrasena debe tener al menos {$passwordMinLength} caracteres.",
+            'new_password.confirmed' => 'La confirmacion no coincide con la nueva contrasena.',
+        ]);
+
+        if (! Hash::check($validated['current_password'], $user->password_hash)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['La contrasena actual no es correcta.'],
+            ]);
+        }
+
+        $user->forceFill(['password_hash' => Hash::make($validated['new_password'])])->save();
+
+        return response()->json(['message' => 'Contrasena actualizada correctamente.']);
+    }
+
     public function logout(Request $request): JsonResponse
     {
         $tokenId = $request->attributes->get('api_token_id');
@@ -213,6 +281,7 @@ class AuthController extends Controller
             'last_login' => $user->last_login instanceof Carbon
                 ? $user->last_login->toIso8601String()
                 : $user->last_login,
+            'created_at' => $user->created_at?->toIso8601String(),
             'company' => $company ? (array) $company : null,
             'branch' => $branch ? (array) $branch : null,
             'role' => $role

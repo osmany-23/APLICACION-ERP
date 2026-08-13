@@ -23,6 +23,8 @@ class AccountsReceivable extends Model
         'total_amount',
         'paid_amount',
         'balance',
+        'late_fee_accrued',
+        'late_fee_last_run_at',
         'status',
         'notes',
     ];
@@ -39,6 +41,8 @@ class AccountsReceivable extends Model
         'total_amount' => 'decimal:4',
         'paid_amount' => 'decimal:4',
         'balance' => 'decimal:4',
+        'late_fee_accrued' => 'decimal:4',
+        'late_fee_last_run_at' => 'date',
     ];
 
     public function customer(): BelongsTo

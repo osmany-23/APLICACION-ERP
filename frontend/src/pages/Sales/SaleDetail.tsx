@@ -117,6 +117,19 @@ export default function SaleDetail() {
           </div>
         </div>
 
+        {sale.salesperson_name && sale.salesperson_name !== sale.created_by_name && (
+          <div className="mb-6 grid grid-cols-1 gap-4 rounded-lg border border-primary/20 bg-primary/5 p-4 sm:grid-cols-2 print:hidden">
+            <div>
+              <p className="text-xs font-semibold uppercase text-slate-500">Vendedor (via PIN)</p>
+              <p className="font-semibold text-primary">{sale.salesperson_name}</p>
+            </div>
+            <div className="sm:text-right">
+              <p className="text-xs font-semibold uppercase text-slate-500">Registrado por</p>
+              <p className="font-semibold text-black dark:text-white">{sale.created_by_name ?? '-'}</p>
+            </div>
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="min-w-full text-left">
             <thead>

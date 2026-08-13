@@ -3,7 +3,9 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
 import Loader from './common/Loader';
 import { GuestRoute, ProtectedRoute } from './components/Auth/ProtectedRoute';
+import { RequirePermission } from './components/Auth/RequirePermission';
 import PageTitle from './components/PageTitle';
+import useColorMode from './hooks/useColorMode';
 import DefaultLayout from './layout/DefaultLayout';
 import SignIn from './pages/Authentication/SignIn';
 import Calendar from './pages/Calendar';
@@ -23,6 +25,12 @@ import PurchasesPage from './pages/Purchases';
 import PurchaseForm from './pages/Purchases/PurchaseForm';
 import PurchaseDetail from './pages/Purchases/PurchaseDetail';
 import RelationCatalogs from './pages/RelationCatalogs';
+import UsersPage from './pages/Administration/Users';
+import RolesPage from './pages/Administration/Roles';
+import PermissionsPage from './pages/Administration/Permissions';
+import EmployeesPage from './pages/Administration/Employees';
+import DepartmentsPage from './pages/Administration/Departments';
+import PositionsPage from './pages/Administration/Positions';
 import SalesPage from './pages/Sales';
 import SaleForm from './pages/Sales/SaleForm';
 import SaleDetail from './pages/Sales/SaleDetail';
@@ -199,6 +207,60 @@ function ProtectedAppRoutes() {
             }
           />
           <Route
+            path="/administration/users"
+            element={
+              <RequirePermission module="usuarios">
+                <PageTitle title="Usuarios | Sistema ERP" />
+                <UsersPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/administration/roles"
+            element={
+              <RequirePermission module="roles">
+                <PageTitle title="Roles | Sistema ERP" />
+                <RolesPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/administration/permissions"
+            element={
+              <RequirePermission module="permisos">
+                <PageTitle title="Permisos | Sistema ERP" />
+                <PermissionsPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/administration/employees"
+            element={
+              <RequirePermission module="empleados">
+                <PageTitle title="Empleados | Sistema ERP" />
+                <EmployeesPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/administration/departments"
+            element={
+              <RequirePermission module="empleados">
+                <PageTitle title="Departamentos | Sistema ERP" />
+                <DepartmentsPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/administration/positions"
+            element={
+              <RequirePermission module="empleados">
+                <PageTitle title="Cargos | Sistema ERP" />
+                <PositionsPage />
+              </RequirePermission>
+            }
+          />
+          <Route
             path="/settings/currencies"
             element={
               <>
@@ -316,6 +378,11 @@ function ProtectedAppRoutes() {
 function App() {
   const [loading, setLoading] = useState<boolean>(true);
   const { pathname } = useLocation();
+  // Sincroniza la clase `dark` en <body> desde el primer render, sin
+  // importar por que ruta entra el usuario (antes solo se aplicaba si
+  // el switcher del Header llegaba a montarse, dejando /auth/signin sin
+  // tema oscuro en una carga directa/fria).
+  useColorMode();
 
   useEffect(() => {
     window.scrollTo(0, 0);

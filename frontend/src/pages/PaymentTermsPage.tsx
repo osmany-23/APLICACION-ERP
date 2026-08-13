@@ -3,6 +3,7 @@ import { FiEdit2, FiPlus, FiSearch, FiTrash2, FiX } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { ApiError, apiRequest } from '../services/api';
 import { SwitchField } from '../components/SwitchField';
+import ActionsMenu from '../components/ActionsMenu';
 
 type PaymentTerm = {
   id: number;
@@ -293,13 +294,14 @@ export default function PaymentTermsPage() {
                   <td className="px-3 py-3">{item.discount_days ?? '-'}</td>
                   <td className="px-3 py-3">{item.is_active ? 'Activo' : 'Inactivo'}</td>
                   <td className="px-3 py-3">
-                    <div className="flex justify-end gap-2">
-                      <button type="button" onClick={() => openEdit(item)} className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#0F9F37] text-[#0F9F37] hover:bg-[#0F9F37] hover:text-white">
-                        <FiEdit2 />
-                      </button>
-                      <button type="button" onClick={() => void handleDelete(item)} className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-red-500 text-red-500 hover:bg-red-500 hover:text-white">
-                        <FiTrash2 />
-                      </button>
+                    <div className="flex justify-end">
+                      <ActionsMenu
+                        ariaLabel={`Mas opciones de ${item.name}`}
+                        items={[
+                          { label: 'Editar', icon: FiEdit2, onClick: () => openEdit(item) },
+                          { label: 'Eliminar', icon: FiTrash2, variant: 'danger', onClick: () => void handleDelete(item) },
+                        ]}
+                      />
                     </div>
                   </td>
                 </tr>

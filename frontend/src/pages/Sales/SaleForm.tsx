@@ -63,6 +63,14 @@ export default function SaleForm() {
   const [items, setItems] = useState<SaleItemDraft[]>([]);
   const [selectedProductId, setSelectedProductId] = useState('');
 
+  // PIN de venta rapida (opcional): identifica quien vendio realmente sin
+  // tener que cerrar la sesion compartida de la PC. No reemplaza la sesion
+  // ni sus permisos, solo etiqueta la factura con sales.salesperson_id.
+  const [salespersonPin, setSalespersonPin] = useState('');
+  const [salespersonId, setSalespersonId] = useState<number | null>(null);
+  const [salespersonName, setSalespersonName] = useState<string | null>(null);
+  const [pinStatus, setPinStatus] = useState<'idle' | 'checking' | 'ok' | 'error'>('idle');
+
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -99,6 +107,38 @@ export default function SaleForm() {
   useEffect(() => {
     void loadCatalogs();
   }, [loadCatalogs]);
+
+  useEffect(() => {
+    if (salespersonPin.length !== 4) {
+      setSalespersonId(null);
+      setSalespersonName(null);
+      setPinStatus('idle');
+      return;
+    }
+
+    if (!token) return;
+
+    setPinStatus('checking');
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await apiRequest<{ data: { id: number; full_name: string } }>(
+          '/pos/pin/resolve',
+          { method: 'POST', body: JSON.stringify({ pin: salespersonPin }) },
+          token,
+        );
+        setSalespersonId(response.data.id);
+        setSalespersonName(response.data.full_name);
+        setPinStatus('ok');
+      } catch {
+        setSalespersonId(null);
+        setSalespersonName(null);
+        setPinStatus('error');
+      }
+    }, 400);
+
+    return () => window.clearTimeout(timer);
+  }, [salespersonPin, token]);
 
   const selectedCustomer = useMemo(
     () => customers.find((customer) => customer.id === Number(customerId)) ?? null,
@@ -199,6 +239,7 @@ export default function SaleForm() {
             sale_date: saleDate,
             notes: notes.trim() || null,
             confirm,
+            salesperson_id: salespersonId,
             items: items.map((line) => ({
               product_id: line.product_id,
               quantity: line.quantity,
@@ -245,7 +286,7 @@ export default function SaleForm() {
           <label className="block">
             <span className="mb-2 block text-sm font-semibold text-black dark:text-white">Cliente</span>
             <select value={customerId} onChange={(event) => setCustomerId(event.target.value)} className={inputClass}>
-              <option value="">Selecciona un cliente</option>
+              <option value="" disabled hidden>Selecciona un cliente</option>
               {customers.map((customer) => (
                 <option key={customer.id} value={customer.id}>
                   {customer.code} - {customer.full_name}
@@ -262,7 +303,7 @@ export default function SaleForm() {
           <label className="block">
             <span className="mb-2 block text-sm font-semibold text-black dark:text-white">Almacen de salida</span>
             <select value={warehouseId} onChange={(event) => setWarehouseId(event.target.value)} className={inputClass}>
-              <option value="">Selecciona un almacen</option>
+              <option value="" disabled hidden>Selecciona un almacen</option>
               {warehouses.map((warehouse) => (
                 <option key={warehouse.id} value={warehouse.id}>
                   {warehouse.name}
@@ -301,6 +342,25 @@ export default function SaleForm() {
           </label>
 
           <label className="block">
+            <span className="mb-2 block text-sm font-semibold text-black dark:text-white">Vendedor (PIN opcional)</span>
+            <input
+              inputMode="numeric"
+              value={salespersonPin}
+              onChange={(event) => setSalespersonPin(event.target.value.replace(/\D/g, '').slice(0, 4))}
+              className={inputClass}
+              placeholder="4 digitos"
+            />
+            {pinStatus === 'checking' && <p className="mt-2 text-xs text-slate-400">Verificando...</p>}
+            {pinStatus === 'ok' && salespersonName && (
+              <p className="mt-2 text-xs font-semibold text-green-600">✓ Vendedor: {salespersonName}</p>
+            )}
+            {pinStatus === 'error' && <p className="mt-2 text-xs font-semibold text-red-500">PIN invalido.</p>}
+            {pinStatus === 'idle' && (
+              <p className="mt-2 text-xs text-slate-400">Vacio: la factura queda a tu nombre de sesion.</p>
+            )}
+          </label>
+
+          <label className="block">
             <span className="mb-2 block text-sm font-semibold text-black dark:text-white">Notas</span>
             <input value={notes} onChange={(event) => setNotes(event.target.value)} className={inputClass} placeholder="Opcional" />
           </label>
@@ -318,7 +378,7 @@ export default function SaleForm() {
           <label className="block flex-1">
             <span className="mb-2 block text-sm font-semibold text-black dark:text-white">Producto</span>
             <select value={selectedProductId} onChange={(event) => setSelectedProductId(event.target.value)} className={inputClass}>
-              <option value="">Selecciona un producto</option>
+              <option value="" disabled hidden>Selecciona un producto</option>
               {products.map((product) => (
                 <option key={product.id} value={product.id}>
                   {product.code} - {product.name} (Stock: {product.stock})

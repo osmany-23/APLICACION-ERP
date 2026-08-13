@@ -173,4 +173,101 @@ class CustomerControllerTest extends TestCase
         $response->assertOk();
         $this->assertDatabaseHas('customers', ['id' => $customerId, 'status' => 0]);
     }
+
+    public function test_customer_can_be_created_with_extended_profile_fields(): void
+    {
+        $token = $this->authenticateUser();
+
+        $countryId = DB::table('countries')->insertGetId([
+            'iso2' => 'ES', 'iso3' => 'ESP', 'name' => 'España', 'phone_code' => '+34',
+            'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/customers', [
+                'full_name' => 'Cliente Extranjero',
+                'status' => 1,
+                'residency_type' => 'EXTRANJERO',
+                'gender' => 'FEMENINO',
+                'sales_type' => 'CONTADO',
+                'phone' => '600-123-456',
+                'phone_country_id' => $countryId,
+                'has_landline' => true,
+                'landline_phone' => '91 123 45 67',
+                'country_id' => $countryId,
+                'city' => 'Madrid',
+                'applies_late_fee' => true,
+                'late_fee_percentage' => 3.5,
+                'late_fee_period_unit' => 'WEEKS',
+            ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('item.residency_type', 'EXTRANJERO');
+        $response->assertJsonPath('item.gender', 'FEMENINO');
+        $response->assertJsonPath('item.sales_type', 'CONTADO');
+        $response->assertJsonPath('item.phone_display', '+34 600-123-456');
+        $response->assertJsonPath('item.has_landline', true);
+        $response->assertJsonPath('item.city', 'Madrid');
+        $response->assertJsonPath('item.applies_late_fee', true);
+        $response->assertJsonPath('item.late_fee_percentage', 3.5);
+        $response->assertJsonPath('item.late_fee_period_unit', 'WEEKS');
+    }
+
+    public function test_customer_rejects_phone_with_invalid_characters(): void
+    {
+        $token = $this->authenticateUser();
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/customers', [
+                'full_name' => 'Cliente Telefono Invalido',
+                'status' => 1,
+                'phone' => 'llamame-ya!',
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors('phone');
+    }
+
+    public function test_customer_requires_late_fee_percentage_when_applies_late_fee_enabled(): void
+    {
+        $token = $this->authenticateUser();
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/customers', [
+                'full_name' => 'Cliente Mora Incompleta',
+                'status' => 1,
+                'applies_late_fee' => true,
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['late_fee_percentage', 'late_fee_period_unit']);
+    }
+
+    public function test_customer_requires_landline_phone_when_has_landline_enabled(): void
+    {
+        $token = $this->authenticateUser();
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/customers', [
+                'full_name' => 'Cliente Convencional Incompleto',
+                'status' => 1,
+                'has_landline' => true,
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors('landline_phone');
+    }
+
+    public function test_customer_defaults_residency_and_sales_type_when_omitted(): void
+    {
+        $token = $this->authenticateUser();
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/customers', ['full_name' => 'Cliente Por Defecto', 'status' => 1]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('item.residency_type', 'NACIONAL');
+        $response->assertJsonPath('item.sales_type', 'CREDITO');
+        $this->assertNotNull($response->json('item.registered_at'));
+    }
 }

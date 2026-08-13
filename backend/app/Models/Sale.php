@@ -36,6 +36,7 @@ class Sale extends Model
         'journal_entry_id',
         'notes',
         'created_by',
+        'salesperson_id',
     ];
 
     protected $casts = [
@@ -57,11 +58,23 @@ class Sale extends Model
         'exchange_rate' => 'decimal:8',
         'accounts_receivable_id' => 'integer',
         'journal_entry_id' => 'integer',
+        'created_by' => 'integer',
+        'salesperson_id' => 'integer',
     ];
 
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function salesperson(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'salesperson_id');
+    }
+
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     public function items(): HasMany

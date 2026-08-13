@@ -30,7 +30,9 @@
       "Bash(curl -s -i -X POST http://127.0.0.1:8000/api/settings/payment-methods -H 'Authorization: Bearer __TRACKED_VAR__' -H 'Accept: application/json' -H 'Content-Type: application/json' -d '{\"code\":\"CASH\",\"name\":\"Efectivo\",\"type\":\"CASH\",\"cash\":true,\"is_active\":true}')",
       "Bash(curl -s -i -X POST http://127.0.0.1:8000/api/sales -H 'Authorization: Bearer __TRACKED_VAR__' -H 'Accept: application/json' -H 'Content-Type: application/json' -d '{ *)",
       "Bash(curl -s -X POST http://127.0.0.1:8000/api/sales -H 'Authorization: Bearer __TRACKED_VAR__' -H 'Accept: application/json' -H 'Content-Type: application/json' -d '{ *)",
-      "Bash(curl -s http://127.0.0.1:8000/api/products/1/movements -H 'Authorization: Bearer __TRACKED_VAR__' -H 'Accept: application/json')"
+      "Bash(curl -s http://127.0.0.1:8000/api/products/1/movements -H 'Authorization: Bearer __TRACKED_VAR__' -H 'Accept: application/json')",
+      "Bash(sed -i \"s/->withCount\\(\\),/,/\" app/Http/Controllers/RoleController.php)",
+      "Bash(grep -n 'payload\\($role' app/Http/Controllers/RoleController.php)"
     ]
   }
 }

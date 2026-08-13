@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { FiEye, FiPlus, FiSearch, FiSlash, FiCheckCircle } from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, apiRequest } from '../../services/api';
 import { Purchase, PurchaseListResponse } from '../../types/purchase';
+import ActionsMenu from '../../components/ActionsMenu';
 
 function getErrorMessage(error: unknown) {
   if (error instanceof ApiError) {
@@ -34,6 +35,7 @@ const statusLabels: Record<string, string> = {
 
 export default function PurchasesPage() {
   const { token } = useAuth();
+  const navigate = useNavigate();
   const [items, setItems] = useState<Purchase[]>([]);
   const [meta, setMeta] = useState({ total: 0, total_amount: 0, balance_due: 0 });
   const [loading, setLoading] = useState(true);
@@ -200,34 +202,19 @@ export default function PurchasesPage() {
                     </span>
                   </td>
                   <td className="px-3 py-3">
-                    <div className="flex justify-end gap-2">
-                      <Link
-                        to={`/purchases/${item.id}`}
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-primary text-primary hover:bg-primary hover:text-white"
-                        title="Ver detalle"
-                      >
-                        <FiEye />
-                      </Link>
-                      {item.status === 'DRAFT' && (
-                        <button
-                          type="button"
-                          onClick={() => void handleConfirm(item)}
-                          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#0F9F37] text-[#0F9F37] hover:bg-[#0F9F37] hover:text-white"
-                          title="Confirmar recepcion"
-                        >
-                          <FiCheckCircle />
-                        </button>
-                      )}
-                      {item.status !== 'CANCELLED' && (
-                        <button
-                          type="button"
-                          onClick={() => void handleCancel(item)}
-                          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
-                          title="Anular compra"
-                        >
-                          <FiSlash />
-                        </button>
-                      )}
+                    <div className="flex justify-end">
+                      <ActionsMenu
+                        ariaLabel={`Mas opciones de la compra ${item.purchase_number}`}
+                        items={[
+                          { label: 'Ver detalle', icon: FiEye, onClick: () => navigate(`/purchases/${item.id}`) },
+                          ...(item.status === 'DRAFT'
+                            ? [{ label: 'Confirmar recepcion', icon: FiCheckCircle, onClick: () => void handleConfirm(item) }]
+                            : []),
+                          ...(item.status !== 'CANCELLED'
+                            ? [{ label: 'Anular compra', icon: FiSlash, variant: 'danger' as const, onClick: () => void handleCancel(item) }]
+                            : []),
+                        ]}
+                      />
                     </div>
                   </td>
                 </tr>

@@ -26,7 +26,7 @@ const SelectGroupOne: React.FC = () => {
             isOptionSelected ? 'text-black dark:text-white' : ''
           }`}
         >
-          <option value="" disabled className="text-body dark:text-bodydark">
+          <option value="" disabled hidden className="text-body dark:text-bodydark">
             Select your subject
           </option>
           <option value="USA" className="text-body dark:text-bodydark">

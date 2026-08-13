@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
+  FiBriefcase,
   FiChevronDown,
   FiFileText,
   FiGlobe,
   FiGrid,
+  FiLock,
   FiMenu,
   FiPackage,
   FiSettings,
@@ -13,6 +15,8 @@ import {
   FiUsers,
 } from 'react-icons/fi';
 import { BsPinAngle, BsPinFill } from 'react-icons/bs';
+import { useAuth } from '../../context/AuthContext';
+import { hasModuleAccess } from '../Auth/RequirePermission';
 import { useBranding } from '../../context/BrandingContext';
 
 interface SidebarProps {
@@ -32,7 +36,9 @@ type IconColor =
   | 'cyan'
   | 'rose'
   | 'indigo'
-  | 'slate';
+  | 'slate'
+  | 'red'
+  | 'teal';
 
 const ICON_COLOR_CLASSES: Record<IconColor, string> = {
   sky: 'bg-sky-500/15 text-sky-400 group-hover/icon:bg-sky-500/25',
@@ -43,6 +49,8 @@ const ICON_COLOR_CLASSES: Record<IconColor, string> = {
   rose: 'bg-rose-500/15 text-rose-400 group-hover/icon:bg-rose-500/25',
   indigo: 'bg-indigo-500/15 text-indigo-400 group-hover/icon:bg-indigo-500/25',
   slate: 'bg-slate-500/15 text-slate-300 group-hover/icon:bg-slate-500/25',
+  red: 'bg-red-500/15 text-red-400 group-hover/icon:bg-red-500/25',
+  teal: 'bg-teal-500/15 text-teal-400 group-hover/icon:bg-teal-500/25',
 };
 
 type NavLeaf = {
@@ -65,7 +73,11 @@ type NavGroup = {
 
 type NavItem = NavLeaf | NavGroup;
 
-type NavSection = { title: string; items: NavItem[] };
+// requiresModule: si se define, la seccion solo se muestra cuando el rol del
+// usuario tiene acceso a alguno de esos modulos de permisos (ver
+// hasModuleAccess). Hoy solo la usa "Administracion" — el resto del menu
+// sigue visible para cualquier usuario autenticado, como siempre.
+type NavSection = { title: string; items: NavItem[]; requiresModule?: string | string[] };
 
 // Estructura del menu: agrupada por flujo de negocio (General -> Operaciones
 // -> Configuracion) para que el orden se lea de forma profesional y logica.
@@ -150,12 +162,61 @@ const NAV_SECTIONS: NavSection[] = [
       { kind: 'link', label: 'Configuración', to: '/settings', icon: FiSettings, color: 'slate' },
     ],
   },
+  {
+    title: 'Administración',
+    requiresModule: ['usuarios', 'roles', 'permisos', 'empleados'],
+    items: [
+      {
+        kind: 'group',
+        label: 'Usuarios y Accesos',
+        basePath: '/administration',
+        icon: FiLock,
+        color: 'red',
+        children: [
+          { label: 'Usuarios', to: '/administration/users' },
+          { label: 'Roles', to: '/administration/roles' },
+          { label: 'Permisos', to: '/administration/permissions' },
+        ],
+      },
+      {
+        kind: 'group',
+        label: 'Empleados',
+        basePath: '/administration/employees',
+        icon: FiBriefcase,
+        color: 'teal',
+        children: [
+          { label: 'Empleados', to: '/administration/employees' },
+          { label: 'Departamentos', to: '/administration/departments' },
+          { label: 'Cargos', to: '/administration/positions' },
+        ],
+      },
+    ],
+  },
 ];
+
+// Coincide contra las rutas hijas reales, no solo contra basePath: dos
+// grupos pueden compartir el mismo prefijo largo (ej. "Usuarios y Accesos" y
+// "Empleados" viven ambos bajo /administration) y basePath solo no alcanza
+// para distinguirlos sin ambiguedad.
+function groupMatchesPath(item: NavGroup, pathname: string): boolean {
+  if (item.children.some((child) => pathname === child.to || pathname.startsWith(`${child.to}/`))) {
+    return true;
+  }
+
+  return pathname.startsWith(item.basePath) && !NAV_SECTIONS.some((section) =>
+    section.items.some(
+      (other) =>
+        other.kind === 'group'
+        && other !== item
+        && other.children.some((child) => pathname === child.to || pathname.startsWith(`${child.to}/`)),
+    ),
+  );
+}
 
 function findGroupForPath(pathname: string): string | null {
   for (const section of NAV_SECTIONS) {
     for (const item of section.items) {
-      if (item.kind === 'group' && pathname.startsWith(item.basePath)) {
+      if (item.kind === 'group' && groupMatchesPath(item, pathname)) {
         return item.label;
       }
     }
@@ -183,6 +244,16 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
   const location = useLocation();
   const { pathname } = location;
   const { branding, initials, loginLogoUrl, logoUrl } = useBranding();
+  const { user } = useAuth();
+
+  // Secciones visibles para este usuario: todo lo que no exige un modulo, mas
+  // "Administracion" solo si su rol tiene permiso sobre 'usuarios' (o
+  // superior). No oculta nada por si sola: el backend vuelve a validar cada
+  // endpoint, esto es solo para no mostrar un menu que llevaria a un 403.
+  const visibleSections = useMemo(
+    () => NAV_SECTIONS.filter((section) => !section.requiresModule || hasModuleAccess(user, section.requiresModule)),
+    [user],
+  );
 
   const trigger = useRef<any>(null);
   const sidebar = useRef<any>(null);
@@ -276,7 +347,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
     >
       {/* <!-- SIDEBAR HEADER --> */}
       <div
-        className={`flex items-center justify-between gap-2 px-6 py-5.5 lg:py-6.5 ${
+        className={`flex items-center justify-between gap-2 border-b border-white/[0.06] px-6 py-5.5 lg:py-6.5 ${
           collapsed ? 'lg:justify-center lg:gap-1 lg:px-0' : ''
         }`}
       >
@@ -343,7 +414,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
             collapsed ? 'lg:px-2' : 'lg:px-6'
           } ${collapsed ? 'lg:mt-3' : ''}`}
         >
-          {NAV_SECTIONS.map((section) => (
+          {visibleSections.map((section) => (
             <div
               key={section.title}
               className={`mb-6 transition-[margin] duration-150 ease-out ${collapsed ? 'lg:mb-2' : ''}`}
@@ -358,13 +429,20 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
                         to={item.to}
                         end={item.end}
                         className={({ isActive }) =>
-                          `group/icon relative flex items-center gap-2.5 rounded-sm px-2.5 py-2 font-medium text-bodydark1 duration-300 ease-in-out hover:bg-white/5 dark:hover:bg-meta-4 ${
+                          `group/icon relative flex items-center gap-2.5 rounded-md px-2.5 py-2 font-medium text-bodydark1 duration-200 ease-in-out hover:bg-white/[0.06] hover:text-white ${
                             collapsed ? 'lg:justify-center lg:gap-0 lg:px-0' : ''
-                          } ${isActive ? 'bg-white/5 dark:bg-meta-4' : ''}`
+                          } ${isActive ? 'bg-primary/15 text-white' : ''}`
                         }
                       >
-                        <IconBadge icon={item.icon} color={item.color} />
-                        <span className={labelFade}>{item.label}</span>
+                        {({ isActive }) => (
+                          <>
+                            {isActive && (
+                              <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-primary" />
+                            )}
+                            <IconBadge icon={item.icon} color={item.color} />
+                            <span className={labelFade}>{item.label}</span>
+                          </>
+                        )}
                       </NavLink>
                     </li>
                   ) : (
@@ -372,10 +450,13 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
                       <button
                         type="button"
                         onClick={() => toggleGroup(item.label)}
-                        className={`group/icon relative flex w-full items-center gap-2.5 rounded-sm px-2.5 py-2 font-medium text-bodydark1 duration-300 ease-in-out hover:bg-white/5 dark:hover:bg-meta-4 ${
+                        className={`group/icon relative flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 font-medium text-bodydark1 duration-200 ease-in-out hover:bg-white/[0.06] hover:text-white ${
                           collapsed ? 'lg:justify-center lg:gap-0 lg:px-0' : ''
-                        } ${pathname.startsWith(item.basePath) ? 'bg-white/5 dark:bg-meta-4' : ''}`}
+                        } ${groupMatchesPath(item, pathname) ? 'bg-primary/15 text-white' : ''}`}
                       >
+                        {groupMatchesPath(item, pathname) && (
+                          <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-primary" />
+                        )}
                         <IconBadge icon={item.icon} color={item.color} />
                         <span className={`flex-1 text-left ${labelFade}`}>{item.label}</span>
                         <FiChevronDown

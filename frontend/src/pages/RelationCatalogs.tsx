@@ -23,6 +23,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { ApiError, apiRequest } from '../services/api';
 import { SwitchField } from '../components/SwitchField';
+import ActionsMenu from '../components/ActionsMenu';
 
 type RelationType = 'suppliers' | 'warehouses' | 'branches' | 'companies';
 
@@ -589,25 +590,16 @@ function RelationCatalogs({ relation }: { relation: RelationType }) {
 
   function renderActions(item: RelationItem) {
     return (
-      <div className="flex items-center justify-center gap-3">
-        <button
-          type="button"
-          onClick={() => openEditDialog(item)}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#0F9F37] text-[#0F9F37] transition hover:bg-[#0F9F37] hover:text-white"
-          aria-label={`Editar ${item.name}`}
-        >
-          <FiEdit2 className="h-4.5 w-4.5" />
-        </button>
-        {canDelete && (
-          <button
-            type="button"
-            onClick={() => void handleDelete(item)}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-red-500 text-red-500 transition hover:bg-red-500 hover:text-white"
-            aria-label={`Eliminar ${item.name}`}
-          >
-            <FiTrash2 className="h-4.5 w-4.5" />
-          </button>
-        )}
+      <div className="flex items-center justify-center">
+        <ActionsMenu
+          ariaLabel={`Mas opciones de ${item.name}`}
+          items={[
+            { label: 'Editar', icon: FiEdit2, onClick: () => openEditDialog(item) },
+            ...(canDelete
+              ? [{ label: 'Eliminar', icon: FiTrash2, variant: 'danger' as const, onClick: () => void handleDelete(item) }]
+              : []),
+          ]}
+        />
       </div>
     );
   }
@@ -951,7 +943,7 @@ function RelationCatalogs({ relation }: { relation: RelationType }) {
         <div className="fixed inset-0 z-99999 flex items-center justify-center bg-black/50 px-4 py-6">
           <form
             onSubmit={handleSubmit}
-            className="max-h-full w-full max-w-3xl overflow-y-auto rounded-lg border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark"
+            className="max-h-full w-full max-w-5xl overflow-y-auto rounded-lg border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark"
           >
             <div className="mb-6 flex items-center justify-between gap-4">
               <div>
@@ -979,7 +971,7 @@ function RelationCatalogs({ relation }: { relation: RelationType }) {
               </div>
             )}
 
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
               <Field label={relation === 'companies' ? 'Nombre comercial' : 'Nombre'}>
                 <input
                   value={draft.name}
@@ -1020,7 +1012,7 @@ function RelationCatalogs({ relation }: { relation: RelationType }) {
                     onChange={(event) => updateDraft('currencyId', event.target.value)}
                     className={selectClass}
                   >
-                    <option value="">Selecciona una moneda</option>
+                    <option value="" disabled hidden>Selecciona una moneda</option>
                     {currencies.map((currency) => (
                       <option key={currency.id} value={currency.id}>
                         {currency.name} ({currency.code})
@@ -1065,7 +1057,7 @@ function RelationCatalogs({ relation }: { relation: RelationType }) {
                       }
                       className={selectClass}
                     >
-                      <option value="">Selecciona una sucursal</option>
+                      <option value="" disabled hidden>Selecciona una sucursal</option>
                       {branches.map((branch) => (
                         <option key={branch.id} value={branch.id}>
                           {branch.name}
@@ -1137,7 +1129,7 @@ function RelationCatalogs({ relation }: { relation: RelationType }) {
                       }
                       className={selectClass}
                     >
-                      <option value="">Selecciona un plazo</option>
+                      <option value="" disabled hidden>Selecciona un plazo</option>
                       {paymentTerms.map((term) => (
                         <option key={term.id} value={term.id}>
                           {term.name}
@@ -1170,16 +1162,18 @@ function RelationCatalogs({ relation }: { relation: RelationType }) {
                       placeholder="0"
                     />
                   </Field>
-                  <Field label="Notas">
-                    <textarea
-                      value={draft.notes}
-                      onChange={(event) =>
-                        updateDraft('notes', event.target.value)
-                      }
-                      className={textareaClass}
-                      placeholder="Comentarios adicionales"
-                    />
-                  </Field>
+                  <div className="md:col-span-2 xl:col-span-3">
+                    <Field label="Notas">
+                      <textarea
+                        value={draft.notes}
+                        onChange={(event) =>
+                          updateDraft('notes', event.target.value)
+                        }
+                        className={textareaClass}
+                        placeholder="Comentarios adicionales"
+                      />
+                    </Field>
+                  </div>
                 </>
               )}
 
@@ -1193,7 +1187,7 @@ function RelationCatalogs({ relation }: { relation: RelationType }) {
                 />
               )}
 
-              <div className="md:col-span-2">
+              <div className="md:col-span-2 xl:col-span-3">
                 <Field label="Direccion">
                   <textarea
                     value={draft.address}

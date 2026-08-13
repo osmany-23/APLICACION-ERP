@@ -358,4 +358,69 @@ class SaleControllerTest extends TestCase
         $this->assertDatabaseCount('sales', 0);
         $this->assertDatabaseCount('accounts_receivable', 0);
     }
+
+    public function test_sale_can_be_attributed_to_a_different_salesperson_via_pin(): void
+    {
+        $token = $this->seedFixtures();
+
+        $salespersonRoleId = DB::table('roles')->insertGetId([
+            'company_id' => $this->companyId, 'name' => 'Ventas', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $salespersonId = DB::table('users')->insertGetId([
+            'company_id' => $this->companyId,
+            'role_id' => $salespersonRoleId,
+            'uuid' => (string) Str::uuid(),
+            'username' => 'cajero-pin',
+            'password_hash' => bcrypt('password'),
+            'full_name' => 'Cajero Con Pin',
+            'status' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/sales', [
+                'customer_id' => $this->customerId,
+                'warehouse_id' => $this->warehouseId,
+                'salesperson_id' => $salespersonId,
+                'confirm' => false,
+                'items' => [$this->saleItemPayload(1)],
+            ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('item.salesperson_id', $salespersonId);
+        $this->assertNotEquals($response->json('item.created_by'), $response->json('item.salesperson_id'));
+    }
+
+    public function test_sale_rejects_salesperson_from_another_company(): void
+    {
+        $token = $this->seedFixtures();
+
+        $otherCompanyId = DB::table('companies')->insertGetId([
+            'uuid' => (string) Str::uuid(), 'name' => 'Otra Empresa', 'status' => 1,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $foreignUserId = DB::table('users')->insertGetId([
+            'company_id' => $otherCompanyId,
+            'uuid' => (string) Str::uuid(),
+            'username' => 'foraneo',
+            'password_hash' => bcrypt('password'),
+            'full_name' => 'Usuario De Otra Empresa',
+            'status' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/sales', [
+                'customer_id' => $this->customerId,
+                'warehouse_id' => $this->warehouseId,
+                'salesperson_id' => $foreignUserId,
+                'confirm' => false,
+                'items' => [$this->saleItemPayload(1)],
+            ]);
+
+        $response->assertStatus(422);
+        $this->assertDatabaseCount('sales', 0);
+    }
 }
