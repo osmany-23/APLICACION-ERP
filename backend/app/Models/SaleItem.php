@@ -21,6 +21,11 @@ class SaleItem extends Model
         'tax',
         'subtotal',
         'total',
+        'has_warranty',
+        'warranty_days',
+        'warranty_period_unit',
+        'warranty_type',
+        'warranty_expires_at',
     ];
 
     protected $casts = [
@@ -34,6 +39,9 @@ class SaleItem extends Model
         'tax' => 'decimal:4',
         'subtotal' => 'decimal:4',
         'total' => 'decimal:4',
+        'has_warranty' => 'boolean',
+        'warranty_days' => 'integer',
+        'warranty_expires_at' => 'date',
     ];
 
     public function sale(): BelongsTo

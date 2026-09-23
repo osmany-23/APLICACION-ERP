@@ -306,7 +306,6 @@ class RelationController extends Controller
                 'companies.phone',
                 'companies.email',
                 'companies.commercial_address as address',
-                'companies.logo',
                 'companies.currency_id',
                 'companies.status',
             ])
@@ -340,7 +339,7 @@ class RelationController extends Controller
                 'phone' => $company->phone,
                 'email' => $company->email,
                 'address' => $company->address,
-                'logo' => $company->logo,
+                'logo' => app(\App\Services\ImageLibraryService::class)->primaryUrlFor('company_logo', (int) $company->id),
                 'currency_id' => $company->currency_id !== null ? (int) $company->currency_id : null,
                 'status' => (int) ($company->status ?? 0),
                 'branches_count' => (int) $company->branches_count,

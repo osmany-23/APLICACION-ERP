@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { BsCashCoin } from 'react-icons/bs';
 import DropdownMessage from './DropdownMessage';
 import DropdownNotification from './DropdownNotification';
 import DropdownUser from './DropdownUser';
@@ -121,6 +122,21 @@ const Header = (props: {
             {/* <!-- Dark Mode Toggler --> */}
             <DarkModeSwitcher />
             {/* <!-- Dark Mode Toggler --> */}
+
+            {/* <!-- TPV: abre el punto de venta a pantalla completa en una pestana nueva --> */}
+            <li>
+              <Link
+                to="/pos"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Abrir punto de venta"
+                className="group flex items-center gap-2 rounded-full bg-gradient-to-r from-primary to-[#6577F3] px-4 py-2 text-xs font-black uppercase tracking-wide text-white shadow-4 transition hover:shadow-lg hover:brightness-110 active:scale-95"
+              >
+                <BsCashCoin className="h-4 w-4 transition-transform group-hover:scale-110" />
+                TPV
+              </Link>
+            </li>
+            {/* <!-- TPV --> */}
 
             {/* <!-- Notification Menu Area --> */}
             {branding.notifications_enabled !== false && <DropdownNotification />}

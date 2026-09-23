@@ -176,6 +176,8 @@ class CustomerController extends Controller
             'current_balance' => $balance,
             'credit_available' => max(0, $creditLimit - $balance),
             'discount_rate' => (float) $customer->discount_rate,
+            'ir_withholding_agent' => (bool) $customer->ir_withholding_agent,
+            'ir_withholding_rate' => (float) $customer->ir_withholding_rate,
             'birthday' => $customer->birthday?->toDateString(),
             'salesperson_id' => $customer->salesperson_id,
             'rating' => $customer->rating,
@@ -224,6 +226,8 @@ class CustomerController extends Controller
             'late_fee_percentage' => ['nullable', 'numeric', 'min:0', 'max:100', 'required_if:applies_late_fee,true'],
             'late_fee_period_unit' => ['nullable', Rule::in(['DAYS', 'WEEKS', 'MONTHS']), 'required_if:applies_late_fee,true'],
             'discount_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'ir_withholding_agent' => ['sometimes', 'boolean'],
+            'ir_withholding_rate' => ['nullable', 'numeric', 'min:0', 'max:100', 'required_if:ir_withholding_agent,true'],
             'birthday' => ['nullable', 'date'],
             'salesperson_id' => ['nullable', 'integer'],
             'rating' => ['nullable', 'integer', 'min:1', 'max:5'],
@@ -240,6 +244,7 @@ class CustomerController extends Controller
             'contact_phone.regex' => 'El telefono de contacto solo puede tener numeros, espacios y guiones.',
             'late_fee_percentage.required_if' => 'Ingresa el porcentaje de mora.',
             'late_fee_period_unit.required_if' => 'Selecciona el periodo de mora (dias, semanas o meses).',
+            'ir_withholding_rate.required_if' => 'Ingresa el porcentaje de retencion de IR.',
         ]);
     }
 
@@ -274,6 +279,8 @@ class CustomerController extends Controller
             'late_fee_percentage' => isset($validated['late_fee_percentage']) ? (float) $validated['late_fee_percentage'] : null,
             'late_fee_period_unit' => $validated['late_fee_period_unit'] ?? null,
             'discount_rate' => (float) ($validated['discount_rate'] ?? 0),
+            'ir_withholding_agent' => $this->boolValue($validated['ir_withholding_agent'] ?? false),
+            'ir_withholding_rate' => isset($validated['ir_withholding_rate']) ? (float) $validated['ir_withholding_rate'] : 2.00,
             'birthday' => $validated['birthday'] ?? null,
             'salesperson_id' => $validated['salesperson_id'] ?? null,
             'rating' => $validated['rating'] ?? null,

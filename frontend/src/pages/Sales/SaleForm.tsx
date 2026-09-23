@@ -5,19 +5,22 @@ import { useAuth } from '../../context/AuthContext';
 import { ApiError, apiRequest } from '../../services/api';
 import { Customer, CustomerListResponse } from '../../types/customer';
 import { SaleItemDraft, SaleSaveResponse } from '../../types/sale';
+import { PriceTier, resolveTierPrice } from '../../utils/pricing';
 
 type Warehouse = { id: number; name: string };
-type PaymentMethod = { id: number; name: string; cash: boolean };
+type PaymentMethod = { id: number; name: string; cash: boolean; card: boolean; requires_reference: boolean };
 type PaymentTerm = { id: number; name: string; days: number };
 type ProductOption = {
   id: number;
   code: string;
   name: string;
   sale_price: number;
+  price_tiers: PriceTier[];
   tax_type: string;
   tax_percentage: number;
   stock: number;
   allow_sale: boolean;
+  is_kit: boolean;
 };
 
 function getErrorMessage(error: unknown) {
@@ -57,6 +60,7 @@ export default function SaleForm() {
   const [customerId, setCustomerId] = useState(initialCustomerId);
   const [warehouseId, setWarehouseId] = useState('');
   const [paymentMethodId, setPaymentMethodId] = useState('');
+  const [paymentReference, setPaymentReference] = useState('');
   const [paymentTermId, setPaymentTermId] = useState('');
   const [saleDate, setSaleDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
@@ -153,8 +157,11 @@ export default function SaleForm() {
       const existing = current.find((line) => line.product_id === product.id);
 
       if (existing) {
+        const nextQuantity = existing.quantity + 1;
         return current.map((line) =>
-          line.product_id === product.id ? { ...line, quantity: line.quantity + 1 } : line,
+          line.product_id === product.id
+            ? { ...line, quantity: nextQuantity, unit_price: resolveTierPrice(line, nextQuantity) }
+            : line,
         );
       }
 
@@ -165,11 +172,14 @@ export default function SaleForm() {
           product_id: product.id,
           product_name: `${product.code} - ${product.name}`,
           quantity: 1,
-          unit_price: product.sale_price,
+          unit_price: resolveTierPrice(product, 1),
+          sale_price: product.sale_price,
+          price_tiers: product.price_tiers,
           discount: 0,
           tax_type: product.tax_type,
           tax_percentage: product.tax_percentage,
           stock: product.stock,
+          is_kit: product.is_kit,
         },
       ];
     });
@@ -200,6 +210,8 @@ export default function SaleForm() {
   }, [items]);
 
   const isCreditSale = paymentMethodId === '';
+  const selectedPaymentMethod = paymentMethods.find((method) => method.id === Number(paymentMethodId));
+  const needsReference = Boolean(selectedPaymentMethod?.card || selectedPaymentMethod?.requires_reference);
 
   async function submitSale(confirm: boolean) {
     setError('');
@@ -219,6 +231,11 @@ export default function SaleForm() {
       return;
     }
 
+    if (needsReference && !paymentReference.trim()) {
+      setError('Ingresa el codigo de referencia de esta forma de pago.');
+      return;
+    }
+
     if (!token) {
       setError('No autenticado.');
       return;
@@ -235,6 +252,7 @@ export default function SaleForm() {
             customer_id: Number(customerId),
             warehouse_id: Number(warehouseId),
             payment_method_id: paymentMethodId ? Number(paymentMethodId) : null,
+            payment_reference: paymentReference.trim() || undefined,
             payment_term_id: paymentTermId ? Number(paymentTermId) : null,
             sale_date: saleDate,
             notes: notes.trim() || null,
@@ -319,7 +337,14 @@ export default function SaleForm() {
 
           <label className="block">
             <span className="mb-2 block text-sm font-semibold text-black dark:text-white">Forma de pago</span>
-            <select value={paymentMethodId} onChange={(event) => setPaymentMethodId(event.target.value)} className={inputClass}>
+            <select
+              value={paymentMethodId}
+              onChange={(event) => {
+                setPaymentMethodId(event.target.value);
+                setPaymentReference('');
+              }}
+              className={inputClass}
+            >
               <option value="">Credito (cuenta por cobrar)</option>
               {paymentMethods.map((method) => (
                 <option key={method.id} value={method.id}>
@@ -328,6 +353,18 @@ export default function SaleForm() {
               ))}
             </select>
           </label>
+
+          {needsReference && (
+            <label className="block">
+              <span className="mb-2 block text-sm font-semibold text-black dark:text-white">Codigo de referencia</span>
+              <input
+                value={paymentReference}
+                onChange={(event) => setPaymentReference(event.target.value)}
+                className={inputClass}
+                placeholder="N. de autorizacion, voucher o transferencia"
+              />
+            </label>
+          )}
 
           <label className="block">
             <span className="mb-2 block text-sm font-semibold text-black dark:text-white">Condicion de pago</span>
@@ -381,7 +418,7 @@ export default function SaleForm() {
               <option value="" disabled hidden>Selecciona un producto</option>
               {products.map((product) => (
                 <option key={product.id} value={product.id}>
-                  {product.code} - {product.name} (Stock: {product.stock})
+                  {product.code} - {product.name} ({product.is_kit ? 'Combo/Kit' : `Stock: ${product.stock}`})
                 </option>
               ))}
             </select>
@@ -416,7 +453,7 @@ export default function SaleForm() {
                   <tr key={line.key} className="border-b border-stroke text-sm dark:border-strokedark">
                     <td className="px-3 py-3">
                       {line.product_name}
-                      {line.quantity > line.stock && (
+                      {!line.is_kit && line.quantity > line.stock && (
                         <p className="mt-1 text-xs font-semibold text-red-500">Cantidad mayor al stock disponible ({line.stock}).</p>
                       )}
                     </td>
@@ -426,7 +463,10 @@ export default function SaleForm() {
                         min="0.0001"
                         step="0.0001"
                         value={line.quantity}
-                        onChange={(event) => updateItem(line.key, { quantity: Number(event.target.value) || 0 })}
+                        onChange={(event) => {
+                          const nextQuantity = Number(event.target.value) || 0;
+                          updateItem(line.key, { quantity: nextQuantity, unit_price: resolveTierPrice(line, nextQuantity) });
+                        }}
                         className="h-10 w-full rounded-lg border border-stroke bg-white px-2 text-sm dark:border-strokedark dark:bg-boxdark"
                       />
                     </td>
@@ -493,6 +533,19 @@ export default function SaleForm() {
               <span className="font-bold text-black dark:text-white">Total</span>
               <span className="font-bold text-black dark:text-white">{formatCurrency(totals.total)}</span>
             </div>
+            {!isCreditSale && selectedCustomer?.ir_withholding_agent && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-300">
+                Este cliente retiene IR ({selectedCustomer.ir_withholding_rate}%). Estimado de retencion:{' '}
+                <span className="font-bold">
+                  {formatCurrency(totals.total * (selectedCustomer.ir_withholding_rate / 100))}
+                </span>
+                . Efectivo/banco estimado a recibir:{' '}
+                <span className="font-bold">
+                  {formatCurrency(totals.total * (1 - selectedCustomer.ir_withholding_rate / 100))}
+                </span>
+                . El monto final lo calcula el sistema al confirmar.
+              </div>
+            )}
           </div>
         </div>
       </div>

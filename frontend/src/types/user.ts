@@ -22,6 +22,7 @@ export type ManagedUser = {
   employee: UserEmployeeRef | null;
   status: number;
   status_label: string;
+  max_discount_percentage: number | null;
   has_pin: boolean;
   pin_generated_at: string | null;
   can_generate_pin: boolean;

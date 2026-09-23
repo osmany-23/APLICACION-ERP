@@ -51,6 +51,7 @@ class SecuritySeeder extends Seeder
             'global_catalogs',
             'payment_methods',
             'payment_terms',
+            'cajas',
         ];
         $actions = ['ver', 'crear', 'editar', 'eliminar', 'view', 'index', 'store', 'update', 'destroy', 'status', 'manage', 'administrar'];
 
@@ -62,6 +63,28 @@ class SecuritySeeder extends Seeder
             ['module_name' => 'usuarios', 'action_name' => 'pin'],
             ['updated_at' => now()]
         );
+
+        // Acciones puntuales del modulo de Caja: por el manejo de dinero
+        // fisico, las operaciones sensibles (abrir/cerrar/mover efectivo/
+        // ver otras cajas/anular/autorizar) son permisos independientes de
+        // los genericos ver/crear/editar/eliminar, para poder darselos a un
+        // Cajero sin darle acceso a administrar cajas o ver las de otros.
+        $cajaActions = [
+            'abrir',
+            'cerrar',
+            'agregar_efectivo',
+            'retirar_efectivo',
+            'ver_todas',
+            'anular_movimiento',
+            'autorizar_movimiento',
+            'realizar_arqueo',
+        ];
+        foreach ($cajaActions as $action) {
+            DB::table('permissions')->updateOrInsert(
+                ['module_name' => 'cajas', 'action_name' => $action],
+                ['updated_at' => now()]
+            );
+        }
 
         $permissionIds = [];
 
@@ -86,6 +109,14 @@ class SecuritySeeder extends Seeder
             ->where('action_name', 'pin')
             ->value('id');
         $permissionIds[] = $pinPermissionId;
+
+        $cajaActionPermissionIds = DB::table('permissions')
+            ->where('module_name', 'cajas')
+            ->whereIn('action_name', $cajaActions)
+            ->pluck('id');
+        foreach ($cajaActionPermissionIds as $permId) {
+            $permissionIds[] = $permId;
+        }
 
         // 3. Asignar de forma segura los permisos al Administrador
         // Limpiamos los permisos viejos del admin antes para no duplicar relaciones
@@ -112,6 +143,16 @@ class SecuritySeeder extends Seeder
             ->whereIn('module_name', $vendedorModules)
             ->whereIn('action_name', $vendedorActions)
             ->pluck('id');
+
+        // Un cajero necesita poder ver el catalogo de cajas, abrir/cerrar su
+        // turno y registrar entradas/salidas de efectivo — pero no
+        // administrar cajas, ver las de otros usuarios ni anular/autorizar
+        // movimientos (eso queda solo para Administrador).
+        $vendedorCajaPermissionIds = DB::table('permissions')
+            ->where('module_name', 'cajas')
+            ->whereIn('action_name', ['ver', 'view', 'index', 'abrir', 'cerrar', 'agregar_efectivo', 'retirar_efectivo', 'realizar_arqueo'])
+            ->pluck('id');
+        $vendedorPermissionIds = $vendedorPermissionIds->merge($vendedorCajaPermissionIds);
 
         foreach ($vendedorPermissionIds->unique() as $permId) {
             DB::table('role_permissions')->insert([

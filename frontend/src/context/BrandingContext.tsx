@@ -18,6 +18,9 @@ export type Branding = {
   logo_dark_url?: string | null;
   favicon_url?: string | null;
   notifications_enabled?: boolean;
+  // Alto en pixeles para mostrar el logo (login y ticket de venta) —
+  // configurable en Configuracion > Empresa > Identidad visual.
+  logo_height?: number;
 };
 
 type BrandingResponse = {
@@ -43,6 +46,7 @@ const defaultBranding: Branding = {
   logo_dark_url: null,
   favicon_url: null,
   notifications_enabled: true,
+  logo_height: 64,
 };
 
 const BrandingContext = createContext<BrandingContextValue | undefined>(
@@ -62,6 +66,10 @@ function normalizeBranding(branding?: Partial<Branding> | null): Branding {
       branding?.welcome_text ||
       (companyName ? `Bienvenido a ${companyName}` : defaultBranding.welcome_text),
     notifications_enabled: branding?.notifications_enabled !== false,
+    logo_height:
+      Number.isFinite(branding?.logo_height) && Number(branding?.logo_height) > 0
+        ? Number(branding?.logo_height)
+        : defaultBranding.logo_height,
   };
 }
 

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -29,6 +30,7 @@ class User extends Authenticatable
         'role_id',
         'status',
         'last_login',
+        'max_discount_percentage',
     ];
 
     // pin_hash se asigna deliberadamente fuera de mass-assignment (via
@@ -44,6 +46,7 @@ class User extends Authenticatable
         'status' => 'integer',
         'last_login' => 'datetime',
         'pin_generated_at' => 'datetime',
+        'max_discount_percentage' => 'decimal:2',
     ];
 
     public function role(): BelongsTo
@@ -54,6 +57,16 @@ class User extends Authenticatable
     public function employee(): HasOne
     {
         return $this->hasOne(Employee::class);
+    }
+
+    /**
+     * Cajas que este usuario esta autorizado a operar (abrir/usar), sin que
+     * eso lo convierta automaticamente en responsable de una apertura
+     * concreta (eso lo define cash_sessions.opened_by por sesion).
+     */
+    public function authorizedCashRegisters(): BelongsToMany
+    {
+        return $this->belongsToMany(CashRegister::class, 'cash_register_users');
     }
 
     /**

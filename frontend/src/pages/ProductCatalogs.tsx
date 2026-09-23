@@ -22,6 +22,7 @@ import { useAuth } from '../context/AuthContext';
 import { ApiError, apiRequest } from '../services/api';
 import { SwitchField } from '../components/SwitchField';
 import ActionsMenu from '../components/ActionsMenu';
+import ImageUploadField from '../components/ImageUploadField';
 
 type CatalogType = 'brands' | 'categories' | 'subcategories' | 'units';
 
@@ -346,10 +347,8 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
       name: draft.name.trim(),
     };
 
-    if (config.hasImage) {
-      payload.image_url = draft.imageUrl.trim();
-    }
-
+    // La imagen ya no viaja en este payload: se sube aparte como archivo
+    // real via POST /catalogs/{catalog}/{id}/image (ver ImageUploadField).
     if (config.hasDescription) {
       payload.description = draft.description.trim();
     }
@@ -397,7 +396,6 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
 
       if (catalog === 'brands' || catalog === 'categories' || catalog === 'subcategories') {
         payload.description = item.description || '';
-        payload.image_url = item.image_url || '';
       }
 
       if (config.hasShortName) {
@@ -874,14 +872,27 @@ function ProductCatalogs({ catalog }: { catalog: CatalogType }) {
               </Field>
 
               {(catalog === 'brands' || catalog === 'categories' || catalog === 'subcategories') && config.hasImage && (
-                <Field label="URL de imagen">
-                  <input
-                    value={draft.imageUrl}
-                    onChange={(event) => updateDraft('imageUrl', event.target.value)}
-                    className={inputClass}
-                    placeholder="https://example.com/logo.png"
-                  />
-                </Field>
+                <div className="sm:col-span-2">
+                  <Field label="Imagen">
+                    <ImageUploadField
+                      imageUrl={draft.imageUrl}
+                      uploadUrl={`/catalogs/${catalog}/${editingItem?.id}/image`}
+                      deleteUrl={`/catalogs/${catalog}/${editingItem?.id}/image`}
+                      token={token}
+                      disabled={!editingItem}
+                      disabledHint={`Guarda la ${config.singular} para poder subir una imagen.`}
+                      onUploaded={(url) => {
+                        updateDraft('imageUrl', url);
+
+                        if (editingItem) {
+                          setItems((current) =>
+                            current.map((it) => (it.id === editingItem.id ? { ...it, image_url: url } : it)),
+                          );
+                        }
+                      }}
+                    />
+                  </Field>
+                </div>
               )}
 
               {(catalog === 'brands' || catalog === 'categories' || catalog === 'subcategories') && config.hasDescription && (

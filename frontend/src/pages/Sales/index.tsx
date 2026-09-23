@@ -1,10 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FiEye, FiPlus, FiSearch, FiSlash, FiCheckCircle } from 'react-icons/fi';
+import {
+  FiEye,
+  FiPlus,
+  FiPrinter,
+  FiSearch,
+  FiSlash,
+  FiCheckCircle,
+  FiClock,
+  FiDollarSign,
+  FiMinusCircle,
+  FiPlusCircle,
+} from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError, apiRequest } from '../../services/api';
 import { Sale, SaleListResponse } from '../../types/sale';
+import { ManagedUser, UserListResponse } from '../../types/user';
 import ActionsMenu from '../../components/ActionsMenu';
+import CancelSaleModal from '../../components/CancelSaleModal';
+import AbonarModal from '../../components/AbonarModal';
 
 function getErrorMessage(error: unknown) {
   if (error instanceof ApiError) {
@@ -28,7 +42,7 @@ const statusStyles: Record<string, string> = {
 
 const statusLabels: Record<string, string> = {
   DRAFT: 'Borrador',
-  PENDING: 'Pendiente',
+  PENDING: 'Pendiente de pago',
   COMPLETED: 'Confirmada',
   CANCELLED: 'Anulada',
 };
@@ -43,6 +57,12 @@ export default function SalesPage() {
   const [notice, setNotice] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [salespersonId, setSalespersonId] = useState('');
+  const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [abonarSale, setAbonarSale] = useState<Sale | null>(null);
+  const [cancelSale, setCancelSale] = useState<Sale | null>(null);
 
   const loadItems = useCallback(async () => {
     if (!token) {
@@ -55,7 +75,13 @@ export default function SalesPage() {
     setError('');
 
     try {
-      const query = statusFilter ? `?status=${statusFilter}` : '';
+      const params = new URLSearchParams();
+      if (statusFilter) params.set('status', statusFilter);
+      if (dateFrom) params.set('date_from', dateFrom);
+      if (dateTo) params.set('date_to', dateTo);
+      if (salespersonId) params.set('salesperson_id', salespersonId);
+      const query = params.toString() ? `?${params.toString()}` : '';
+
       const response = await apiRequest<SaleListResponse>(`/sales${query}`, {}, token);
       setItems(response.data);
       setMeta(response.meta);
@@ -65,26 +91,19 @@ export default function SalesPage() {
     } finally {
       setLoading(false);
     }
-  }, [token, statusFilter]);
+  }, [token, statusFilter, dateFrom, dateTo, salespersonId]);
 
   useEffect(() => {
     void loadItems();
   }, [loadItems]);
 
-  async function handleCancel(sale: Sale) {
+  useEffect(() => {
     if (!token) return;
 
-    const confirmed = window.confirm(`¿Anular la factura ${sale.sale_number}?`);
-    if (!confirmed) return;
-
-    try {
-      const response = await apiRequest<{ message: string }>(`/sales/${sale.id}/cancel`, { method: 'POST' }, token);
-      setNotice(response.message);
-      await loadItems();
-    } catch (cancelError) {
-      setError(getErrorMessage(cancelError));
-    }
-  }
+    apiRequest<UserListResponse>('/users', {}, token)
+      .then((response) => setUsers(response.data))
+      .catch(() => setUsers([]));
+  }, [token]);
 
   async function handleConfirm(sale: Sale) {
     if (!token) return;
@@ -108,6 +127,7 @@ export default function SalesPage() {
   }, [items, search]);
 
   return (
+    <>
     <div className="rounded-[10px] border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark">
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
@@ -140,7 +160,7 @@ export default function SalesPage() {
         </div>
       </div>
 
-      <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <label className="flex items-center gap-2 rounded-lg border border-stroke bg-white px-3 py-2 dark:border-strokedark dark:bg-boxdark">
           <FiSearch className="text-slate-400" />
           <input
@@ -157,10 +177,61 @@ export default function SalesPage() {
         >
           <option value="">Todos los estados</option>
           <option value="DRAFT">Borrador</option>
-          <option value="PENDING">Pendiente</option>
+          <option value="PENDING">Pendiente de pago</option>
           <option value="COMPLETED">Confirmada</option>
           <option value="CANCELLED">Anulada</option>
         </select>
+        <select
+          value={salespersonId}
+          onChange={(event) => setSalespersonId(event.target.value)}
+          className="h-11 rounded-lg border border-stroke bg-white px-3 text-sm outline-none dark:border-strokedark dark:bg-boxdark"
+        >
+          <option value="">Todos los vendedores</option>
+          {users.map((user) => (
+            <option key={user.id} value={user.id}>{user.full_name}</option>
+          ))}
+        </select>
+        <label className="flex h-11 items-center gap-2 rounded-lg border border-stroke bg-white px-3 dark:border-strokedark dark:bg-boxdark">
+          <span className="text-xs font-semibold text-slate-400">Desde</span>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(event) => setDateFrom(event.target.value)}
+            className="w-full bg-transparent text-sm outline-none"
+          />
+        </label>
+        <label className="flex h-11 items-center gap-2 rounded-lg border border-stroke bg-white px-3 dark:border-strokedark dark:bg-boxdark">
+          <span className="text-xs font-semibold text-slate-400">Hasta</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(event) => setDateTo(event.target.value)}
+            className="w-full bg-transparent text-sm outline-none"
+          />
+        </label>
+      </div>
+
+      <div className="mb-5 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setStatusFilter(statusFilter === 'PENDING' ? '' : 'PENDING')}
+          className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold transition ${
+            statusFilter === 'PENDING'
+              ? 'bg-indigo-500 text-white'
+              : 'border border-indigo-200 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-900 dark:text-indigo-300 dark:hover:bg-indigo-900/20'
+          }`}
+        >
+          <FiClock className="h-3.5 w-3.5" /> Pendientes de pago
+        </button>
+        {(statusFilter || dateFrom || dateTo || salespersonId) && (
+          <button
+            type="button"
+            onClick={() => { setStatusFilter(''); setDateFrom(''); setDateTo(''); setSalespersonId(''); }}
+            className="text-xs font-semibold text-slate-400 hover:text-primary"
+          >
+            Quitar filtros
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -187,9 +258,6 @@ export default function SalesPage() {
                   <td className="px-3 py-3">
                     <div>{item.customer_name ?? 'Cliente'}</div>
                     <div className="text-xs text-slate-500">{item.customer_code}</div>
-                    {item.salesperson_name && item.salesperson_name !== item.created_by_name && (
-                      <div className="text-xs font-semibold text-primary">Vendedor: {item.salesperson_name}</div>
-                    )}
                   </td>
                   <td className="px-3 py-3 text-right font-semibold">{formatCurrency(item.total)}</td>
                   <td className="px-3 py-3 text-right">
@@ -209,12 +277,22 @@ export default function SalesPage() {
                       <ActionsMenu
                         ariaLabel={`Mas opciones de la factura ${item.sale_number}`}
                         items={[
-                          { label: 'Ver detalle', icon: FiEye, onClick: () => navigate(`/sales/${item.id}`) },
+                          { label: 'Ver detalle de factura', icon: FiEye, onClick: () => navigate(`/sales/${item.id}`) },
+                          { label: 'Imprimir factura', icon: FiPrinter, onClick: () => window.open(`/sales/${item.id}?print=1`, '_blank', 'noopener,noreferrer') },
                           ...(item.status === 'DRAFT'
                             ? [{ label: 'Confirmar factura', icon: FiCheckCircle, onClick: () => void handleConfirm(item) }]
                             : []),
+                          ...(item.status === 'PENDING'
+                            ? [{ label: 'Abonar', icon: FiDollarSign, onClick: () => setAbonarSale(item) }]
+                            : []),
+                          ...(item.status === 'COMPLETED'
+                            ? [
+                                { label: 'Nota de credito', icon: FiMinusCircle, onClick: () => navigate(`/sales/${item.id}`) },
+                                { label: 'Nota de debito', icon: FiPlusCircle, onClick: () => navigate(`/sales/${item.id}`) },
+                              ]
+                            : []),
                           ...(item.status !== 'CANCELLED'
-                            ? [{ label: 'Anular factura', icon: FiSlash, variant: 'danger' as const, onClick: () => void handleCancel(item) }]
+                            ? [{ label: 'Anular factura', icon: FiSlash, variant: 'danger' as const, onClick: () => setCancelSale(item) }]
                             : []),
                         ]}
                       />
@@ -234,5 +312,32 @@ export default function SalesPage() {
         </div>
       )}
     </div>
+
+    {abonarSale && token && (
+      <AbonarModal
+        sale={abonarSale}
+        token={token}
+        onClose={() => setAbonarSale(null)}
+        onRegistered={(message) => {
+          setAbonarSale(null);
+          setNotice(message);
+          void loadItems();
+        }}
+      />
+    )}
+
+    {cancelSale && token && (
+      <CancelSaleModal
+        sale={cancelSale}
+        token={token}
+        onClose={() => setCancelSale(null)}
+        onCancelled={(message) => {
+          setCancelSale(null);
+          setNotice(message);
+          void loadItems();
+        }}
+      />
+    )}
+    </>
   );
 }

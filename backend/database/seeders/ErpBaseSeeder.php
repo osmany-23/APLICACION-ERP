@@ -135,6 +135,23 @@ class ErpBaseSeeder extends Seeder
                 'updated_at' => now(),
                 'created_at' => now(),
             ]);
+
+            // Tipo de precio de ejemplo para la empresa demo, para que se
+            // pueda probar precios por volumen sin tener que crearlo a
+            // mano primero. NO se siembra automaticamente para empresas
+            // nuevas reales: cada empresa define sus propios tipos de
+            // precio desde Configuracion > Tipos de Precio.
+            DB::table('price_lists')->updateOrInsert([
+                'company_id' => $companyId,
+                'code' => 'MAYORISTA',
+            ], [
+                'name' => 'Precio Mayorista',
+                'description' => 'Precio con descuento por volumen, se asigna por producto con su cantidad minima.',
+                'is_default' => false,
+                'is_active' => true,
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]);
         }
     }
 }

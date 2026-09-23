@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   FiBriefcase,
   FiChevronDown,
+  FiDollarSign,
   FiFileText,
   FiGlobe,
   FiGrid,
@@ -144,6 +145,26 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    title: 'Caja',
+    requiresModule: 'cajas',
+    items: [
+      {
+        kind: 'group',
+        label: 'Punto de caja',
+        basePath: '/cash-register',
+        icon: FiDollarSign,
+        color: 'indigo',
+        children: [
+          { label: 'Mi caja', to: '/cash-register/desk' },
+          { label: 'Monitor de cajas', to: '/cash-register/monitor' },
+          { label: 'Cajas', to: '/cash-register/registers' },
+          { label: 'Terminales', to: '/cash-register/terminals' },
+          { label: 'Motivos de movimiento', to: '/cash-register/reasons' },
+        ],
+      },
+    ],
+  },
+  {
     title: 'Configuración',
     items: [
       {
@@ -157,6 +178,7 @@ const NAV_SECTIONS: NavSection[] = [
           { label: 'Términos de Pago', to: '/settings/payment-terms' },
           { label: 'Métodos de Pago', to: '/settings/payment-methods' },
           { label: 'Tipos de Documento', to: '/settings/document-types' },
+          { label: 'Tipos de Precio', to: '/settings/price-types' },
         ],
       },
       { kind: 'link', label: 'Configuración', to: '/settings', icon: FiSettings, color: 'slate' },

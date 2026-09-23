@@ -72,6 +72,7 @@ class UserController extends Controller
                 'phone' => $this->nullableText($validated['phone'] ?? null),
                 'role_id' => $validated['role_id'] ?? null,
                 'status' => $this->statusValue($validated['status'] ?? 1),
+                'max_discount_percentage' => $this->nullableNumber($validated['max_discount_percentage'] ?? null),
             ]);
         });
 
@@ -106,6 +107,7 @@ class UserController extends Controller
             'email' => $this->nullableText($validated['email'] ?? null),
             'phone' => $this->nullableText($validated['phone'] ?? null),
             'role_id' => $newRoleId,
+            'max_discount_percentage' => $this->nullableNumber($validated['max_discount_percentage'] ?? null),
         ]);
 
         return response()->json([
@@ -223,6 +225,7 @@ class UserController extends Controller
                 : null,
             'status' => (int) $user->status,
             'status_label' => (int) $user->status === 1 ? 'Activo' : 'Inactivo',
+            'max_discount_percentage' => $user->max_discount_percentage !== null ? (float) $user->max_discount_percentage : null,
             'has_pin' => ! empty($user->pin_hash),
             'pin_generated_at' => $user->pin_generated_at?->toIso8601String(),
             'can_generate_pin' => $this->roleHasPermission($user->role_id, 'usuarios', 'pin'),
@@ -243,6 +246,11 @@ class UserController extends Controller
             'branch_id' => ['nullable', 'integer', Rule::exists('branches', 'id')->where('company_id', $companyId)],
             'role_id' => ['nullable', 'integer', Rule::exists('roles', 'id')->where('company_id', $companyId)],
             'status' => ['sometimes', Rule::in([1, 0, '1', '0', true, false])],
+            // Limite personal de descuento del vendedor (no del rol: dos
+            // usuarios con el mismo rol pueden tener valores distintos) —
+            // ver SalesService::resolveMaxLineDiscount(), que lo combina
+            // con el limite del producto/general usando el mas restrictivo.
+            'max_discount_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ];
 
         if ($userId === null) {
@@ -385,5 +393,14 @@ class UserController extends Controller
         $value = trim((string) $value);
 
         return $value === '' ? null : $value;
+    }
+
+    private function nullableNumber(mixed $value): ?float
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return (float) $value;
     }
 }

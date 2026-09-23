@@ -304,7 +304,8 @@ const SignIn = () => {
                 <img
                   src={loginLogoUrl || logoUrl || ''}
                   alt={branding.company_name}
-                  className="mb-2 h-16 w-auto object-contain"
+                  className="mb-2 w-auto object-contain"
+                  style={{ height: branding.logo_height ?? 64 }}
                 />
               ) : (
                 <span className="mb-2 flex h-16 w-16 items-center justify-center rounded-xl bg-[#155EEF]/10 text-xl font-black text-[#155EEF] dark:bg-[#155EEF]/20">

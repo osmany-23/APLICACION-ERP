@@ -10,6 +10,13 @@ import {
 } from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
 import { apiRequest } from '../../services/api';
+import { DashboardAnalytics } from '../../types/dashboard';
+import ChartCard from '../../components/Charts/ChartCard';
+import TrendLineChart from '../../components/Charts/TrendLineChart';
+import SimpleBarChart from '../../components/Charts/SimpleBarChart';
+import HorizontalBarChart from '../../components/Charts/HorizontalBarChart';
+import DonutChart from '../../components/Charts/DonutChart';
+import PeriodSelector, { DashboardPeriod } from '../../components/Charts/PeriodSelector';
 
 // Panel principal del ERP. A diferencia de la plantilla original (que
 // mostraba datos de muestra: "Total Views", un mapa, un chat falso), este
@@ -157,6 +164,38 @@ const ECommerce = () => {
   const [purchaseMeta, setPurchaseMeta] = useState({ total: 0, total_amount: 0, balance_due: 0 });
   const [customers, setCustomers] = useState<DashboardCustomer[]>([]);
 
+  const [period, setPeriod] = useState<DashboardPeriod>('30d');
+  const [compare, setCompare] = useState(false);
+  const [analytics, setAnalytics] = useState<DashboardAnalytics | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!token) return;
+
+    let cancelled = false;
+    setAnalyticsLoading(true);
+
+    apiRequest<{ data: DashboardAnalytics }>(
+      `/dashboard/analytics?period=${period}&compare=${compare ? 1 : 0}`,
+      {},
+      token,
+    )
+      .then((response) => {
+        if (!cancelled) setAnalytics(response.data);
+      })
+      .catch(() => {
+        // Silencioso, igual que el resto del panel: si falla, esa seccion
+        // de graficos simplemente no se muestra.
+      })
+      .finally(() => {
+        if (!cancelled) setAnalyticsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, period, compare]);
+
   useEffect(() => {
     if (!token) return;
 
@@ -282,13 +321,20 @@ const ECommerce = () => {
 
   return (
     <>
-      <div className="mb-6 flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
+      <div className="mb-6 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div>
           <h1 className="text-title-sm font-bold text-black dark:text-white">
-            Hola, {firstName} 👋
+            Hola, {firstName} 
           </h1>
           <p className="mt-1 text-sm capitalize text-bodydark2">{today}</p>
         </div>
+        <PeriodSelector
+          period={period}
+          onPeriodChange={setPeriod}
+          compare={compare}
+          onCompareChange={setCompare}
+          loading={analyticsLoading}
+        />
       </div>
 
       {loading ? (
@@ -333,7 +379,174 @@ const ECommerce = () => {
             />
           </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-4 md:mt-6 xl:grid-cols-2">
+          {analytics && (
+            <>
+              {/* ---------------------------------------------------------------- */}
+              {/* Tendencias                                                        */}
+              {/* ---------------------------------------------------------------- */}
+              <h2 className="mb-3 mt-8 text-base font-bold text-black dark:text-white">Tendencias</h2>
+
+              <ChartCard
+                title="Tendencia de ventas"
+                subtitle={`Ventas confirmadas · ${analytics.period.label}`}
+                className="mb-4"
+              >
+                <TrendLineChart
+                  categories={analytics.trends.labels}
+                  height={320}
+                  series={[
+                    { name: 'Ventas', data: analytics.trends.sales, color: '#155EEF' },
+                    ...(analytics.comparison
+                      ? [{ name: `Periodo anterior (${analytics.comparison.period.label})`, data: analytics.comparison.trends.sales, color: '#94A3B8' }]
+                      : []),
+                  ]}
+                />
+              </ChartCard>
+
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <ChartCard title="Tendencia de compras" subtitle="Compras recibidas">
+                  <TrendLineChart
+                    categories={analytics.trends.labels}
+                    series={[
+                      { name: 'Compras', data: analytics.trends.purchases, color: '#F79009' },
+                      ...(analytics.comparison
+                        ? [{ name: `Periodo anterior (${analytics.comparison.period.label})`, data: analytics.comparison.trends.purchases, color: '#94A3B8' }]
+                        : []),
+                    ]}
+                  />
+                </ChartCard>
+
+                <ChartCard title="Ventas vs Compras" subtitle="Comparativa del periodo">
+                  <TrendLineChart
+                    categories={analytics.trends.labels}
+                    area={false}
+                    series={[
+                      { name: 'Ventas', data: analytics.trends.sales, color: '#155EEF' },
+                      { name: 'Compras', data: analytics.trends.purchases, color: '#F79009' },
+                    ]}
+                  />
+                </ChartCard>
+
+                <ChartCard title="Flujo de caja" subtitle="Ventas en efectivo menos compras pagadas en efectivo, por día" className="xl:col-span-2">
+                  <TrendLineChart
+                    categories={analytics.trends.labels}
+                    series={[
+                      { name: 'Flujo de caja neto', data: analytics.trends.cash_flow, color: '#12B76A' },
+                      ...(analytics.comparison
+                        ? [{ name: `Periodo anterior (${analytics.comparison.period.label})`, data: analytics.comparison.trends.cash_flow, color: '#94A3B8' }]
+                        : []),
+                    ]}
+                  />
+                </ChartCard>
+              </div>
+
+              {/* ---------------------------------------------------------------- */}
+              {/* Ventas                                                            */}
+              {/* ---------------------------------------------------------------- */}
+              <h2 className="mb-3 mt-8 text-base font-bold text-black dark:text-white">Ventas</h2>
+
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <ChartCard title="Ventas por categoría">
+                  <SimpleBarChart data={analytics.sales_by_category} />
+                </ChartCard>
+                <ChartCard title="Ventas por sucursal">
+                  <SimpleBarChart data={analytics.sales_by_branch} color="#7C6FF0" />
+                </ChartCard>
+                <ChartCard title="Ventas por vendedor">
+                  <HorizontalBarChart data={analytics.sales_by_seller} color="#155EEF" />
+                </ChartCard>
+                <ChartCard title="Métodos de pago">
+                  <DonutChart data={analytics.payment_methods} />
+                </ChartCard>
+              </div>
+
+              {/* ---------------------------------------------------------------- */}
+              {/* Rankings                                                          */}
+              {/* ---------------------------------------------------------------- */}
+              <h2 className="mb-3 mt-8 text-base font-bold text-black dark:text-white">Rankings</h2>
+
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <ChartCard title="Top 10 productos vendidos">
+                  <HorizontalBarChart data={analytics.top_products} color="#12B76A" />
+                </ChartCard>
+                <ChartCard title="Top 10 clientes">
+                  <HorizontalBarChart data={analytics.top_customers} color="#EE46BC" />
+                </ChartCard>
+              </div>
+
+              {/* ---------------------------------------------------------------- */}
+              {/* Utilidad y rentabilidad                                           */}
+              {/* ---------------------------------------------------------------- */}
+              <h2 className="mb-3 mt-8 text-base font-bold text-black dark:text-white">Utilidad y rentabilidad</h2>
+
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <ChartCard title="Ventas vs Costo">
+                  <TrendLineChart
+                    categories={analytics.trends.labels}
+                    area={false}
+                    series={[
+                      { name: 'Ventas', data: analytics.trends.sales, color: '#155EEF' },
+                      { name: 'Costo', data: analytics.trends.cost, color: '#F04438' },
+                    ]}
+                  />
+                </ChartCard>
+                <ChartCard title="Utilidad bruta">
+                  <TrendLineChart
+                    categories={analytics.trends.labels}
+                    series={[
+                      { name: 'Utilidad bruta', data: analytics.trends.gross_profit, color: '#12B76A' },
+                      ...(analytics.comparison
+                        ? [{ name: `Periodo anterior (${analytics.comparison.period.label})`, data: analytics.comparison.trends.gross_profit, color: '#94A3B8' }]
+                        : []),
+                    ]}
+                  />
+                </ChartCard>
+                <ChartCard title="Margen %" subtitle="Utilidad bruta sobre ventas" className="xl:col-span-2">
+                  <TrendLineChart categories={analytics.trends.labels} valueType="percent" series={[{ name: 'Margen %', data: analytics.trends.margin_percent, color: '#7C6FF0' }]} />
+                </ChartCard>
+                <ChartCard title="Utilidad por categoría">
+                  <SimpleBarChart data={analytics.profitability.by_category} color="#12B76A" />
+                </ChartCard>
+                <ChartCard title="Utilidad por producto">
+                  <HorizontalBarChart data={analytics.profitability.by_product} color="#155EEF" />
+                </ChartCard>
+                <ChartCard title="Productos más rentables" subtitle="Mejor margen %, no mayor ganancia en córdobas" className="xl:col-span-2">
+                  <HorizontalBarChart data={analytics.profitability.most_profitable} valueType="percent" color="#F79009" />
+                </ChartCard>
+              </div>
+
+              {/* ---------------------------------------------------------------- */}
+              {/* Inventario y cartera                                              */}
+              {/* ---------------------------------------------------------------- */}
+              <h2 className="mb-3 mt-8 text-base font-bold text-black dark:text-white">Inventario y cartera</h2>
+
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <ChartCard title="Productos con stock bajo" subtitle="Existencia actual vs mínimo configurado">
+                  <SimpleBarChart
+                    data={analytics.low_stock_products.map((p) => ({ label: p.label, value: p.value }))}
+                    valueType="number"
+                    color="#F04438"
+                    emptyMessage="Ningún producto está por debajo de su stock mínimo."
+                  />
+                </ChartCard>
+                <ChartCard title="Productos sin movimiento" subtitle="Sin ventas en los últimos 90 días">
+                  <SimpleBarChart
+                    data={analytics.stagnant_products.map((p) => ({ label: p.label, value: p.never_sold ? 0 : (p.value ?? 0) }))}
+                    valueType="number"
+                    color="#F79009"
+                    emptyMessage="Todos los productos han tenido movimiento reciente."
+                  />
+                </ChartCard>
+                <ChartCard title="Estado de cuentas por cobrar" className="xl:col-span-2">
+                  <DonutChart data={analytics.receivables_status} emptyMessage="No hay cuentas por cobrar pendientes." />
+                </ChartCard>
+              </div>
+            </>
+          )}
+
+          <h2 className="mb-3 mt-8 text-base font-bold text-black dark:text-white">Actividad reciente</h2>
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             <PanelCard title="Ventas recientes" action={{ label: 'Ver todas', to: '/sales' }}>
               {recentSales.length === 0 ? (
                 <p className="py-6 text-center text-sm text-bodydark2">

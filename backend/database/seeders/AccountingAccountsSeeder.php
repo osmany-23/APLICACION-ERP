@@ -45,6 +45,7 @@ class AccountingAccountsSeeder extends Seeder
             ['code' => '1103', 'name' => 'Cuentas por Cobrar Clientes', 'type' => 'ASSET', 'parent' => '1100'],
             ['code' => '1104', 'name' => 'Inventario de Mercancías', 'type' => 'ASSET', 'parent' => '1100'],
             ['code' => '1105', 'name' => 'IVA Acreditable', 'type' => 'ASSET', 'parent' => '1100'],
+            ['code' => '1106', 'name' => 'Retenciones IR Sufridas', 'type' => 'ASSET', 'parent' => '1100'],
             ['code' => '2000', 'name' => 'PASIVO', 'type' => 'LIABILITY', 'parent' => null],
             ['code' => '2100', 'name' => 'Pasivo Corriente', 'type' => 'LIABILITY', 'parent' => '2000'],
             ['code' => '2101', 'name' => 'Cuentas por Pagar Proveedores', 'type' => 'LIABILITY', 'parent' => '2100'],
@@ -53,6 +54,7 @@ class AccountingAccountsSeeder extends Seeder
             ['code' => '3101', 'name' => 'Capital Social', 'type' => 'EQUITY', 'parent' => '3000'],
             ['code' => '4000', 'name' => 'INGRESOS', 'type' => 'REVENUE', 'parent' => null],
             ['code' => '4101', 'name' => 'Ingresos por Ventas', 'type' => 'REVENUE', 'parent' => '4000'],
+            ['code' => '4102', 'name' => 'Devoluciones sobre Ventas', 'type' => 'REVENUE', 'parent' => '4000'],
             ['code' => '5000', 'name' => 'COSTOS Y GASTOS', 'type' => 'EXPENSE', 'parent' => null],
             ['code' => '5101', 'name' => 'Costo de Ventas', 'type' => 'EXPENSE', 'parent' => '5000'],
             ['code' => '5201', 'name' => 'Gastos Operativos', 'type' => 'EXPENSE', 'parent' => '5000'],
@@ -144,6 +146,49 @@ class AccountingAccountsSeeder extends Seeder
                 'name' => 'Factura de Venta',
                 'prefix' => 'FACT',
                 'next_number' => DB::table('document_types')->where('code', 'FACT')->value('next_number') ?? 1,
+                'is_active' => true,
+                'updated_at' => now(),
+                'created_at' => now(),
+            ],
+        );
+
+        // Cotizacion sin efecto contable/de inventario: el TPV la crea como
+        // venta DRAFT (SalesService::createSale con confirm=false), asi que
+        // nunca mueve stock ni postea asientos hasta que se convierta a una
+        // Factura de Venta real.
+        DB::table('document_types')->updateOrInsert(
+            ['code' => 'PROF'],
+            [
+                'name' => 'Proformas',
+                'prefix' => 'PROF',
+                'next_number' => DB::table('document_types')->where('code', 'PROF')->value('next_number') ?? 1,
+                'is_active' => true,
+                'updated_at' => now(),
+                'created_at' => now(),
+            ],
+        );
+
+        // Notas de Credito/Debito: mismo mecanismo de numeracion que
+        // FACT/PROF (DocumentType::generateDocumentNumber()), usado por
+        // CreditNoteService/DebitNoteService.
+        DB::table('document_types')->updateOrInsert(
+            ['code' => 'NC'],
+            [
+                'name' => 'Nota de Credito',
+                'prefix' => 'NC',
+                'next_number' => DB::table('document_types')->where('code', 'NC')->value('next_number') ?? 1,
+                'is_active' => true,
+                'updated_at' => now(),
+                'created_at' => now(),
+            ],
+        );
+
+        DB::table('document_types')->updateOrInsert(
+            ['code' => 'ND'],
+            [
+                'name' => 'Nota de Debito',
+                'prefix' => 'ND',
+                'next_number' => DB::table('document_types')->where('code', 'ND')->value('next_number') ?? 1,
                 'is_active' => true,
                 'updated_at' => now(),
                 'created_at' => now(),

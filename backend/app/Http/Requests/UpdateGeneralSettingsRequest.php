@@ -99,6 +99,10 @@ class UpdateGeneralSettingsRequest extends FormRequest
             'sales.digits' => ['nullable', 'integer', 'min:1', 'max:20'],
             'sales.rounding' => ['nullable', 'integer', 'min:0', 'max:6'],
             'sales.default_tax_id' => ['nullable', 'integer', Rule::exists('taxes', 'id')],
+            'sales.iva_enabled' => ['nullable', 'boolean'],
+            'sales.iva_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'sales.max_discount_enabled' => ['nullable', 'boolean'],
+            'sales.max_discount_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
 
             'purchases' => ['sometimes', 'array'],
             'purchases.prefix' => ['nullable', 'string', 'max:20'],
@@ -108,6 +112,15 @@ class UpdateGeneralSettingsRequest extends FormRequest
             'printing' => ['sometimes', 'array'],
             'printing.default_format' => ['nullable', Rule::in(['ticket', 'letter', 'a4', 'A4', 'Carta', 'Ticket'])],
             'printing.default_printer' => ['nullable', 'string', 'max:150'],
+
+            'branding' => ['sometimes', 'array'],
+            'branding.logo_height' => ['nullable', 'integer', 'min:24', 'max:240'],
+
+            'receipts' => ['sometimes', 'array'],
+            'receipts.show_logo' => ['nullable', 'boolean'],
+            'receipts.display_name' => ['nullable', 'string', 'max:150'],
+            'receipts.footer_note' => ['nullable', 'string', 'max:500'],
+            'receipts.claim_days' => ['nullable', 'integer', 'min:0', 'max:365'],
 
             'backup' => ['sometimes', 'array'],
             'backup.schedule_enabled' => ['nullable', 'boolean'],

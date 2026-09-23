@@ -14,6 +14,7 @@ import {
   FiClock,
   FiCreditCard,
   FiDatabase,
+  FiFileText,
   FiGlobe,
   FiImage,
   FiLock,
@@ -127,6 +128,8 @@ type SettingsValues = {
   sales?: Record<string, string | number | boolean | null>;
   purchases?: Record<string, string | number | boolean | null>;
   printing?: Record<string, string | number | boolean | null>;
+  branding?: Record<string, string | number | boolean | null>;
+  receipts?: Record<string, string | number | boolean | null>;
   backup?: Record<string, string | number | boolean | null>;
   system?: Record<string, string | number | boolean | null>;
 };
@@ -257,6 +260,10 @@ type SettingsForm = {
     digits: string;
     rounding: string;
     default_tax_id: string;
+    iva_enabled: boolean;
+    iva_rate: string;
+    max_discount_enabled: boolean;
+    max_discount_percentage: string;
   };
   purchases: {
     prefix: string;
@@ -266,6 +273,15 @@ type SettingsForm = {
   printing: {
     default_format: string;
     default_printer: string;
+  };
+  branding: {
+    logo_height: string;
+  };
+  receipts: {
+    show_logo: boolean;
+    display_name: string;
+    footer_note: string;
+    claim_days: string;
   };
   backup: {
     schedule_enabled: boolean;
@@ -378,6 +394,10 @@ const emptyForm: SettingsForm = {
     digits: '8',
     rounding: '2',
     default_tax_id: '',
+    iva_enabled: true,
+    iva_rate: '15',
+    max_discount_enabled: false,
+    max_discount_percentage: '100',
   },
   purchases: {
     prefix: 'COM',
@@ -387,6 +407,15 @@ const emptyForm: SettingsForm = {
   printing: {
     default_format: 'a4',
     default_printer: '',
+  },
+  branding: {
+    logo_height: '64',
+  },
+  receipts: {
+    show_logo: true,
+    display_name: '',
+    footer_note: 'PARA HACER EFECTIVA CUALQUIER DEVOLUCION O CAMBIO, EL PRODUCTO DEBE PRESENTARSE EN SU EMPAQUE ORIGINAL, COMPLETAMENTE SELLADO, SIN ABRIR Y EN PERFECTAS CONDICIONES',
+    claim_days: '5',
   },
   backup: {
     schedule_enabled: false,
@@ -506,6 +535,8 @@ function toFormData(payload: GeneralSettingsData): SettingsForm {
   const sales = settings.sales || {};
   const purchases = settings.purchases || {};
   const printing = settings.printing || {};
+  const branding = settings.branding || {};
+  const receipts = settings.receipts || {};
   const backup = settings.backup || {};
   const system = settings.system || {};
   const headquarters = payload.branches.find((branch) => branch.is_headquarters);
@@ -588,6 +619,10 @@ function toFormData(payload: GeneralSettingsData): SettingsForm {
       digits: text(sales.digits, '8'),
       rounding: text(sales.rounding, '2'),
       default_tax_id: text(sales.default_tax_id),
+      iva_enabled: bool(sales.iva_enabled, true),
+      iva_rate: text(sales.iva_rate, '15'),
+      max_discount_enabled: bool(sales.max_discount_enabled, false),
+      max_discount_percentage: text(sales.max_discount_percentage, '100'),
     },
     purchases: {
       prefix: text(purchases.prefix, 'COM'),
@@ -597,6 +632,18 @@ function toFormData(payload: GeneralSettingsData): SettingsForm {
     printing: {
       default_format: normalizePrintFormat(printing.default_format),
       default_printer: text(printing.default_printer),
+    },
+    branding: {
+      logo_height: text(branding.logo_height, '64'),
+    },
+    receipts: {
+      show_logo: bool(receipts.show_logo, true),
+      display_name: text(receipts.display_name),
+      footer_note: text(
+        receipts.footer_note,
+        'PARA HACER EFECTIVA CUALQUIER DEVOLUCION O CAMBIO, EL PRODUCTO DEBE PRESENTARSE EN SU EMPAQUE ORIGINAL, COMPLETAMENTE SELLADO, SIN ABRIR Y EN PERFECTAS CONDICIONES',
+      ),
+      claim_days: text(receipts.claim_days, '5'),
     },
     backup: {
       schedule_enabled: bool(backup.schedule_enabled, false),
@@ -925,6 +972,10 @@ export default function Settings() {
         digits: intOr(form.sales.digits, 8),
         rounding: intOr(form.sales.rounding, 2),
         default_tax_id: form.sales.default_tax_id ? Number(form.sales.default_tax_id) : null,
+        iva_enabled: form.sales.iva_enabled,
+        iva_rate: numberOrNull(form.sales.iva_rate) ?? 15,
+        max_discount_enabled: form.sales.max_discount_enabled,
+        max_discount_percentage: numberOrNull(form.sales.max_discount_percentage) ?? 100,
       },
       purchases: {
         prefix: nullableText(form.purchases.prefix),
@@ -936,6 +987,15 @@ export default function Settings() {
       printing: {
         default_format: form.printing.default_format,
         default_printer: nullableText(form.printing.default_printer),
+      },
+      branding: {
+        logo_height: intOr(form.branding.logo_height, 64),
+      },
+      receipts: {
+        show_logo: form.receipts.show_logo,
+        display_name: nullableText(form.receipts.display_name),
+        footer_note: nullableText(form.receipts.footer_note),
+        claim_days: intOr(form.receipts.claim_days, 5),
       },
       backup: {
         schedule_enabled: form.backup.schedule_enabled,
@@ -1529,6 +1589,21 @@ export default function Settings() {
                   name="favicon_file"
                   onChange={handleLogoFile}
                 />
+                <Field label="Tamano del logo (alto en pixeles)">
+                  <input
+                    type="number"
+                    min="24"
+                    max="240"
+                    value={form.branding.logo_height}
+                    onChange={(event) => updateGroup('branding', 'logo_height', event.target.value)}
+                    className={inputClass}
+                  />
+                  <p className="mt-1.5 text-xs text-slate-500">
+                    Controla que tan grande se ve el logo en la pantalla de inicio de sesion y en el ticket de venta.
+                    Si tu logo trae mucho espacio en blanco alrededor de la marca, sube este valor para que se vea
+                    mas grande.
+                  </p>
+                </Field>
                 <button
                   type="button"
                   onClick={() => void handleUploadLogos()}
@@ -1873,6 +1948,69 @@ export default function Settings() {
                 </select>
               </Field>
             </div>
+
+            <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border border-stroke p-4 dark:border-strokedark">
+              <div>
+                <p className="text-sm font-semibold text-black dark:text-white">IVA activado</p>
+                <p className="text-xs text-slate-500">
+                  Si se activa, el porcentaje indicado se aplica automaticamente a todo producto gravado al
+                  facturar (POS y Ventas), sin necesidad de configurarlo factura por factura.
+                </p>
+              </div>
+              <ToggleField
+                label="IVA activado"
+                checked={form.sales.iva_enabled}
+                onChange={(checked) => updateGroup('sales', 'iva_enabled', checked)}
+              />
+            </div>
+            {form.sales.iva_enabled && (
+              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <Field label="Porcentaje de IVA general (%)">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={form.sales.iva_rate}
+                    onChange={(event) => updateGroup('sales', 'iva_rate', event.target.value)}
+                    className={inputClass}
+                    placeholder="Ej. 15.00"
+                  />
+                </Field>
+              </div>
+            )}
+
+            <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border border-stroke p-4 dark:border-strokedark">
+              <div>
+                <p className="text-sm font-semibold text-black dark:text-white">Descuento maximo general activado</p>
+                <p className="text-xs text-slate-500">
+                  Tope de respaldo para cualquier producto que no tenga su propio limite de descuento configurado
+                  (ver ficha del producto). Un vendedor con su propio limite (ver Usuarios) sigue aplicando ademas
+                  de este: gana el mas restrictivo.
+                </p>
+              </div>
+              <ToggleField
+                label="Descuento maximo general activado"
+                checked={form.sales.max_discount_enabled}
+                onChange={(checked) => updateGroup('sales', 'max_discount_enabled', checked)}
+              />
+            </div>
+            {form.sales.max_discount_enabled && (
+              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <Field label="Descuento maximo general (%)">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={form.sales.max_discount_percentage}
+                    onChange={(event) => updateGroup('sales', 'max_discount_percentage', event.target.value)}
+                    className={inputClass}
+                    placeholder="Ej. 10.00"
+                  />
+                </Field>
+              </div>
+            )}
           </Panel>
 
           <Panel title="Compras" icon={<FiArchive className="h-5 w-5" />}>
@@ -1935,6 +2073,47 @@ export default function Settings() {
                     updateGroup('printing', 'default_printer', event.target.value)
                   }
                   className={inputClass}
+                />
+              </Field>
+            </div>
+          </Panel>
+
+          <Panel title="Configuracion de Recibos" icon={<FiFileText className="h-5 w-5" />}>
+            <p className="mb-4 text-xs text-slate-500">
+              Controla como se ve el ticket que se imprime al cobrar una venta (POS y reimpresion desde Ventas).
+            </p>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <ToggleField
+                label="Mostrar logo en el recibo"
+                checked={form.receipts.show_logo}
+                onChange={(checked) => updateGroup('receipts', 'show_logo', checked)}
+              />
+              <Field label="Nombre a mostrar en el recibo">
+                <input
+                  value={form.receipts.display_name}
+                  onChange={(event) => updateGroup('receipts', 'display_name', event.target.value)}
+                  className={inputClass}
+                  placeholder={form.company.short_name || form.company.name || 'Nombre comercial de la empresa'}
+                />
+              </Field>
+              <Field label="Dias de vigencia para reclamos/cambios">
+                <input
+                  type="number"
+                  min="0"
+                  max="365"
+                  value={form.receipts.claim_days}
+                  onChange={(event) => updateGroup('receipts', 'claim_days', event.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+            </div>
+            <div className="mt-4">
+              <Field label="Nota del recibo">
+                <textarea
+                  value={form.receipts.footer_note}
+                  onChange={(event) => updateGroup('receipts', 'footer_note', event.target.value)}
+                  className={textareaClass}
+                  placeholder="Ej. condiciones de devolucion o cambio"
                 />
               </Field>
             </div>

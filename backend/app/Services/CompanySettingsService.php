@@ -57,6 +57,26 @@ class CompanySettingsService
                 'digits' => ['value' => 8, 'type' => 'integer'],
                 'rounding' => ['value' => 2, 'type' => 'integer'],
                 'default_tax_id' => ['value' => null, 'type' => 'integer'],
+                // IVA general: si esta activado, el % indicado se aplica
+                // automaticamente a todo producto TAXABLE al facturar (ver
+                // GeneralSettingsController::syncGeneralIvaTax(), que
+                // sincroniza esto con la fila "is_default" de la tabla
+                // taxes — SalesService::resolveLineTax() ya usa esa fila
+                // sin ningun cambio adicional). Por defecto activado al
+                // 15%, igual al IVA15 que ErpBaseSeeder ya sembraba.
+                'iva_enabled' => ['value' => true, 'type' => 'boolean'],
+                'iva_rate' => ['value' => 15.00, 'type' => 'decimal'],
+                // Descuento maximo general: tope de respaldo para
+                // cualquier producto que NO tenga su propio limite
+                // especifico (products.max_discount_type/max_discount_value)
+                // — ver SalesService::resolveMaxLineDiscount(). Un vendedor
+                // con su propio limite (users.max_discount_percentage) sigue
+                // aplicando ademas de este, se usa el mas restrictivo de
+                // los que apliquen. Desactivado por defecto (sin tope
+                // general, solo quedan los limites por producto/vendedor si
+                // se configuran).
+                'max_discount_enabled' => ['value' => false, 'type' => 'boolean'],
+                'max_discount_percentage' => ['value' => 100.00, 'type' => 'decimal'],
             ],
             'purchases' => [
                 'prefix' => ['value' => 'COM', 'type' => 'string'],
@@ -66,6 +86,27 @@ class CompanySettingsService
             'printing' => [
                 'default_format' => ['value' => 'A4', 'type' => 'string'],
                 'default_printer' => ['value' => '', 'type' => 'string'],
+            ],
+            // Tamano en pixeles con el que se muestra el logo de la empresa
+            // (login y ticket de venta — ver brandingPayload() abajo, que
+            // es publico y de ahi lo leen ambos). Antes venia fijo por
+            // CSS (64px); con un logo que trae mucho espacio en blanco
+            // alrededor de la marca eso lo dejaba viendose chico, asi que
+            // ahora es configurable.
+            'branding' => [
+                'logo_height' => ['value' => 64, 'type' => 'integer'],
+            ],
+            // Configuracion del ticket/recibo impreso al cobrar una venta
+            // (POS y reimpresion desde Ventas — ver ReceiptTicket.tsx). El
+            // logo y el nombre real de la empresa ya se configuran en la
+            // pestana "Empresa"; "display_name" es solo un nombre alterno
+            // opcional para el encabezado del ticket (vacio = usa el nombre
+            // comercial de la empresa tal cual).
+            'receipts' => [
+                'show_logo' => ['value' => true, 'type' => 'boolean'],
+                'display_name' => ['value' => '', 'type' => 'string'],
+                'footer_note' => ['value' => 'PARA HACER EFECTIVA CUALQUIER DEVOLUCION O CAMBIO, EL PRODUCTO DEBE PRESENTARSE EN SU EMPAQUE ORIGINAL, COMPLETAMENTE SELLADO, SIN ABRIR Y EN PERFECTAS CONDICIONES', 'type' => 'string'],
+                'claim_days' => ['value' => 5, 'type' => 'integer'],
             ],
             'backup' => [
                 'schedule_enabled' => ['value' => false, 'type' => 'boolean'],

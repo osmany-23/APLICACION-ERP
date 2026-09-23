@@ -36,6 +36,8 @@ export type Customer = {
   current_balance: number;
   credit_available: number;
   discount_rate: number;
+  ir_withholding_agent: boolean;
+  ir_withholding_rate: number;
   birthday: string | null;
   salesperson_id: number | null;
   rating: number | null;

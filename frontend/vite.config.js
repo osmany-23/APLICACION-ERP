@@ -15,4 +15,20 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // React/React DOM/React Router casi nunca cambian entre releases:
+        // separarlos del resto del codigo de la app permite que el
+        // navegador los deje en cache por mucho tiempo, sin tener que
+        // volver a descargarlos cada vez que se despliega un cambio de
+        // una pagina cualquiera. apexcharts/react-apexcharts ya quedan en
+        // su propio chunk automaticamente (solo los importa el Dashboard,
+        // que se carga de forma diferida), no hace falta forzarlo aqui.
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+        },
+      },
+    },
+  },
 })

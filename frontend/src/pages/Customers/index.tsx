@@ -41,6 +41,8 @@ type FormState = {
   late_fee_percentage: string;
   late_fee_period_unit: string;
   discount_rate: string;
+  ir_withholding_agent: boolean;
+  ir_withholding_rate: string;
   notes: string;
   status: boolean;
 };
@@ -74,6 +76,8 @@ const emptyForm: FormState = {
   late_fee_percentage: '',
   late_fee_period_unit: '',
   discount_rate: '0',
+  ir_withholding_agent: false,
+  ir_withholding_rate: '2',
   notes: '',
   status: true,
 };
@@ -233,6 +237,10 @@ export default function CustomersPage() {
       }
     }
 
+    if (state.ir_withholding_agent && (!state.ir_withholding_rate.trim() || Number.isNaN(Number(state.ir_withholding_rate)))) {
+      validation.ir_withholding_rate = 'Ingresa el porcentaje de retencion de IR.';
+    }
+
     return validation;
   }
 
@@ -269,6 +277,8 @@ export default function CustomersPage() {
       late_fee_percentage: item.late_fee_percentage !== null ? String(item.late_fee_percentage) : '',
       late_fee_period_unit: item.late_fee_period_unit ?? '',
       discount_rate: String(item.discount_rate ?? 0),
+      ir_withholding_agent: item.ir_withholding_agent,
+      ir_withholding_rate: String(item.ir_withholding_rate ?? 2),
       notes: item.notes ?? '',
       status: item.status === 1,
     });
@@ -333,6 +343,8 @@ export default function CustomersPage() {
             late_fee_percentage: form.applies_late_fee && form.late_fee_percentage ? Number(form.late_fee_percentage) : null,
             late_fee_period_unit: form.applies_late_fee ? form.late_fee_period_unit || null : null,
             discount_rate: form.discount_rate ? Number(form.discount_rate) : 0,
+            ir_withholding_agent: form.ir_withholding_agent,
+            ir_withholding_rate: form.ir_withholding_agent && form.ir_withholding_rate ? Number(form.ir_withholding_rate) : null,
             notes: form.notes.trim() || null,
             status: form.status,
           }),
@@ -722,6 +734,36 @@ export default function CustomersPage() {
                     </select>
                   </Field>
                 </>
+              )}
+
+              <div className="col-span-full flex items-center justify-between gap-4 rounded-lg border border-stroke p-4 dark:border-strokedark">
+                <div>
+                  <p className="text-sm font-semibold text-black dark:text-white">Retiene IR</p>
+                  <p className="text-xs text-slate-500">
+                    Activa si este cliente es agente retenedor ante la DGI (gran contribuyente u otro designado): al
+                    pagar de contado retiene el % indicado a cuenta de su propio IR y entrega una constancia de
+                    retencion. La factura no cambia, pero se recibe menos efectivo/banco.
+                  </p>
+                </div>
+                <SwitchField
+                  checked={form.ir_withholding_agent}
+                  onChange={(checked) => updateForm('ir_withholding_agent', checked)}
+                  label="Retiene IR"
+                />
+              </div>
+              {form.ir_withholding_agent && (
+                <Field label="Porcentaje de retencion (%)" error={formErrors.ir_withholding_rate}>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={form.ir_withholding_rate}
+                    onChange={(event) => updateForm('ir_withholding_rate', event.target.value)}
+                    className={inputClass}
+                    placeholder="Ej. 2.00"
+                  />
+                </Field>
               )}
 
               <SectionTitle>Otros</SectionTitle>

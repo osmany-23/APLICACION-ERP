@@ -38,21 +38,28 @@ import { useAuth } from '../context/AuthContext';
 import { ApiError, apiRequest } from '../services/api';
 import { SwitchField } from '../components/SwitchField';
 import ActionsMenu from '../components/ActionsMenu';
+import ProductImagesManager, {
+  ProductImageMeta,
+  StagedImage,
+  revokeStagedImages,
+} from '../components/ProductImagesManager';
 
 type ProductStatus = 'Activo' | 'Inactivo';
-type DialogMode = 'create' | 'edit' | 'details' | 'kardex' | null;
+type DialogMode = 'create' | 'edit' | 'kardex' | null;
 type TaxType = 'EXEMPT' | 'TAXABLE';
+type MaxDiscountType = 'PERCENTAGE' | 'FIXED';
 type InventoryStatus =
   | 'RECEIVED'
   | 'PENDING_RECEIPT'
   | 'IN_TRANSIT'
   | 'RESERVED';
 
-type ProductRecord = {
+export type ProductRecord = {
   id: number;
   companyId: number | null;
   company: string;
   imageUrl: string | null;
+  images: ProductImageMeta[];
   name: string;
   fullName: string;
   code: string;
@@ -76,15 +83,23 @@ type ProductRecord = {
   salePriceWithTax: number;
   taxType: TaxType;
   taxPercentage: number;
+  maxDiscountType: MaxDiscountType | null;
+  maxDiscountValue: number | null;
   cost: number;
   stock: number;
   minStock: number;
   maxStock: number | null;
   allowNegativeStock: boolean;
   managesLots: boolean;
+  // Ya no es un toggle propio: se deduce en el backend de si el lote trae
+  // fecha de vencimiento cargada. Se mantiene aqui como dato de solo
+  // lectura (por ejemplo para mostrarlo en el detalle del producto).
   managesExpiration: boolean;
   lotNumber: string;
+  manufacturingDate: string;
   expirationDate: string;
+  expirationAlertDays: number | null;
+  lotPurchasePrice: number | null;
   inventoryStatus: InventoryStatus;
   warehouseId: number | null;
   warehouse: string;
@@ -93,15 +108,44 @@ type ProductRecord = {
   status: ProductStatus;
   description: string;
   model: string;
+  // Formato libre a proposito (sin patron fijo): un producto se mide
+  // "30x34x12", otro como "Altura: 30cm, Largo: 66cm, Grosor: 5cm" — no
+  // tiene sentido forzar un unico formato para todo el catalogo.
+  measurement: string;
   physicalLocation: string;
   isInventory: boolean;
+  // Ya no es un campo que el usuario active a mano: se deduce de
+  // isInventory/isKit (ver productData() en el backend). Se conserva de
+  // solo lectura porque el detalle de producto lo usa para mostrar
+  // "Servicio" como tipo de producto.
   isService: boolean;
   isKit: boolean;
-  allowSale: boolean;
   allowPurchase: boolean;
-  isFavorite: boolean;
   notes: string;
   observations: string;
+  hasWarranty: boolean;
+  warrantyDuration: number | null;
+  warrantyPeriodUnit: WarrantyPeriodUnit;
+  warrantyType: string | null;
+  priceTiers: ProductPriceTierApiRecord[];
+  stockByBranch: ProductStockByBranch[];
+  kitItems: ProductKitItemApiRecord[];
+};
+
+export type WarrantyPeriodUnit = 'DAYS' | 'MONTHS' | 'YEARS';
+
+export type ProductKitItemApiRecord = {
+  id: number;
+  product_id: number;
+  product_name: string;
+  quantity: number;
+};
+
+export type ProductStockByBranch = {
+  branch_id: number | null;
+  branch_name: string;
+  quantity: number;
+  available_quantity: number;
 };
 
 type ProductDraft = {
@@ -129,40 +173,66 @@ type ProductDraft = {
   salePrice: string;
   taxType: TaxType;
   taxPercentage: string;
+  maxDiscountType: MaxDiscountType | '';
+  maxDiscountValue: string;
   cost: string;
   stock: string;
   minStock: string;
   maxStock: string;
   allowNegativeStock: boolean;
   managesLots: boolean;
-  managesExpiration: boolean;
   lotNumber: string;
+  manufacturingDate: string;
   expirationDate: string;
+  expirationAlertDays: string;
+  lotPurchasePrice: string;
   inventoryStatus: InventoryStatus;
   warehouseId: string;
   warehouse: string;
   branchId: string;
   branch: string;
+  // Solo se usa al crear un producto, y solo si el usuario tiene el
+  // permiso 'products'/'administrar' (rol Administrador o equivalente):
+  // deja dar de alta el mismo stock inicial en varios almacenes/sucursales
+  // a la vez, en vez de uno solo. Ver canManageMultipleBranches.
+  warehouseIds: string[];
   status: ProductStatus;
   description: string;
   model: string;
+  // Formato libre a proposito (sin patron fijo): un producto se mide
+  // "30x34x12", otro como "Altura: 30cm, Largo: 66cm, Grosor: 5cm" — no
+  // tiene sentido forzar un unico formato para todo el catalogo.
+  measurement: string;
   physicalLocation: string;
   isInventory: boolean;
-  isService: boolean;
   isKit: boolean;
-  allowSale: boolean;
   allowPurchase: boolean;
-  isFavorite: boolean;
   notes: string;
   observations: string;
   imageUrl: string;
+  hasWarranty: boolean;
+  warrantyDuration: string;
+  warrantyPeriodUnit: WarrantyPeriodUnit;
+  warrantyType: string;
+  priceTiers: PriceTierDraft[];
+  kitItems: KitItemDraft[];
 };
 
-type ProductApiRecord = {
+// Fila del editor de "Componentes del combo/kit": que otro producto de la
+// empresa entra y en que cantidad. Igual que PriceTierDraft, todo como
+// string para que los inputs numericos queden controlados.
+type KitItemDraft = {
+  key: string;
+  productId: string;
+  quantity: string;
+};
+
+export type ProductApiRecord = {
   id: number | string;
   company_id?: number | string | null;
   company?: string | null;
   image_url: string | null;
+  images?: ProductImageMeta[] | null;
   name: string | null;
   full_name?: string | null;
   code: string | null;
@@ -186,6 +256,8 @@ type ProductApiRecord = {
   sale_price_with_tax?: number | string | null;
   tax_type?: string | null;
   tax_percentage?: number | string | null;
+  max_discount_type?: string | null;
+  max_discount_value?: number | string | null;
   cost: number | string | null;
   stock: number | string | null;
   initial_stock?: number | string | null;
@@ -194,8 +266,11 @@ type ProductApiRecord = {
   allow_negative_stock?: boolean | number | string | null;
   manages_lots?: boolean | number | string | null;
   manages_expiration?: boolean | number | string | null;
+  expiration_alert_days?: number | string | null;
   lot_number?: string | null;
+  manufacturing_date?: string | null;
   expiration_date?: string | null;
+  lot_purchase_price?: number | string | null;
   inventory_status?: InventoryStatus | null;
   warehouse_id?: number | string | null;
   warehouse?: string | null;
@@ -205,15 +280,30 @@ type ProductApiRecord = {
   status_label?: string | null;
   description?: string | null;
   model?: string | null;
+  measurement?: string | null;
   physical_location?: string | null;
   is_inventory?: boolean | number | string | null;
   is_service?: boolean | number | string | null;
   is_kit?: boolean | number | string | null;
-  allow_sale?: boolean | number | string | null;
   allow_purchase?: boolean | number | string | null;
-  is_favorite?: boolean | number | string | null;
   notes?: string | null;
   observations?: string | null;
+  has_warranty?: boolean | number | string | null;
+  warranty_duration?: number | string | null;
+  warranty_period_unit?: WarrantyPeriodUnit | null;
+  warranty_type?: string | null;
+  price_tiers?: ProductPriceTierApiRecord[] | null;
+  stock_by_branch?: ProductStockByBranch[] | null;
+  kit_items?: ProductKitItemApiRecord[] | null;
+};
+
+type ProductPriceTierApiRecord = {
+  id: number | string;
+  price_list_id: number | string;
+  price_list_name: string;
+  min_quantity: number | string;
+  price: number | string;
+  is_active: boolean;
 };
 
 type ProductsResponse = {
@@ -230,6 +320,12 @@ type CatalogOption = {
   branch_name?: string | null;
 };
 
+type PriceTypeOption = {
+  id: number;
+  name: string;
+  is_active: boolean;
+};
+
 type CatalogOptions = {
   brands: CatalogOption[];
   categories: CatalogOption[];
@@ -238,10 +334,30 @@ type CatalogOptions = {
   suppliers: CatalogOption[];
   warehouses: CatalogOption[];
   branches: CatalogOption[];
+  priceTypes: PriceTypeOption[];
 };
 
 type CatalogResponse = {
   data: CatalogOption[];
+};
+
+type PriceTypesResponse = {
+  data: PriceTypeOption[];
+};
+
+// Fila del editor de "precios por volumen" en el formulario de producto.
+// Todo como string (igual que el resto de ProductDraft) para que los
+// inputs numericos queden controlados sin pelear con NaN mientras el
+// usuario escribe.
+type PriceTierDraft = {
+  key: string;
+  // El usuario escribe el nombre libremente (no elige de un catalogo
+  // cerrado) — el backend busca/crea el "tipo de precio" por ese nombre.
+  // Ver <datalist> en el formulario: catalogs.priceTypes alimenta las
+  // sugerencias con los nombres ya usados antes.
+  priceListName: string;
+  minQuantity: string;
+  price: string;
 };
 
 type ProductMutationResponse = {
@@ -249,7 +365,7 @@ type ProductMutationResponse = {
   product: ProductApiRecord;
 };
 
-type ProductShowResponse = {
+export type ProductShowResponse = {
   product?: ProductApiRecord;
   data?: ProductApiRecord;
 };
@@ -310,39 +426,49 @@ const emptyDraft: ProductDraft = {
   salePrice: '',
   taxType: 'EXEMPT',
   taxPercentage: '0',
+  maxDiscountType: '',
+  maxDiscountValue: '',
   cost: '',
   stock: '0',
   minStock: '0',
   maxStock: '',
   allowNegativeStock: false,
   managesLots: false,
-  managesExpiration: false,
   lotNumber: '',
+  manufacturingDate: '',
   expirationDate: '',
+  expirationAlertDays: '',
+  lotPurchasePrice: '',
   inventoryStatus: 'RECEIVED',
   warehouseId: '',
   warehouse: '',
   branchId: '',
   branch: '',
+  warehouseIds: [],
   status: 'Activo',
   description: '',
   model: '',
+  measurement: '',
   physicalLocation: '',
   isInventory: true,
-  isService: false,
   isKit: false,
-  allowSale: true,
   allowPurchase: true,
-  isFavorite: false,
   notes: '',
   observations: '',
   imageUrl: '',
+  hasWarranty: false,
+  warrantyDuration: '',
+  warrantyPeriodUnit: 'DAYS',
+  warrantyType: '',
+  priceTiers: [],
+  kitItems: [],
 };
 
 const emptyCatalogs: CatalogOptions = {
   brands: [],
   categories: [],
   subcategories: [],
+  priceTypes: [],
   units: [],
   suppliers: [],
   warehouses: [],
@@ -390,6 +516,10 @@ function normalizeTaxType(value: unknown): TaxType {
     : 'EXEMPT';
 }
 
+function normalizeMaxDiscountType(value: unknown): MaxDiscountType | null {
+  return value === 'PERCENTAGE' || value === 'FIXED' ? value : null;
+}
+
 function formatOptionName(option?: CatalogOption | null) {
   if (!option) {
     return '';
@@ -419,14 +549,14 @@ function normalizeStatus(value: string): ProductStatus {
     : 'Activo';
 }
 
-function formatCurrency(value: number) {
+export function formatCurrency(value: number) {
   return `C$${value.toLocaleString('es-NI', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
 }
 
-function formatQuantity(value: number) {
+export function formatQuantity(value: number) {
   return value.toLocaleString('es-NI', {
     maximumFractionDigits: Number.isInteger(value) ? 0 : 2,
   });
@@ -444,7 +574,7 @@ function getErrorMessage(error: unknown) {
   return 'La solicitud no pudo completarse.';
 }
 
-function mapProduct(product: ProductApiRecord): ProductRecord {
+export function mapProduct(product: ProductApiRecord): ProductRecord {
   const status =
     product.status_label === 'Inactivo' || Number(product.status) === 0
       ? 'Inactivo'
@@ -455,6 +585,7 @@ function mapProduct(product: ProductApiRecord): ProductRecord {
     companyId: product.company_id ? Number(product.company_id) : null,
     company: product.company || '',
     imageUrl: product.image_url || null,
+    images: product.images || [],
     name: product.name || 'Producto sin nombre',
     fullName: product.full_name || '',
     code: product.code || '',
@@ -480,6 +611,11 @@ function mapProduct(product: ProductApiRecord): ProductRecord {
     salePriceWithTax: readNumber(product.sale_price_with_tax),
     taxType: normalizeTaxType(product.tax_type),
     taxPercentage: readNumber(product.tax_percentage),
+    maxDiscountType: normalizeMaxDiscountType(product.max_discount_type),
+    maxDiscountValue:
+      product.max_discount_value === null || product.max_discount_value === undefined
+        ? null
+        : readNumber(product.max_discount_value),
     cost: readNumber(product.cost),
     stock: readNumber(product.initial_stock ?? product.stock),
     minStock: readNumber(product.minimum_stock),
@@ -491,7 +627,16 @@ function mapProduct(product: ProductApiRecord): ProductRecord {
     managesLots: readBoolean(product.manages_lots),
     managesExpiration: readBoolean(product.manages_expiration),
     lotNumber: product.lot_number || '',
+    manufacturingDate: product.manufacturing_date || '',
     expirationDate: product.expiration_date || '',
+    expirationAlertDays:
+      product.expiration_alert_days === null || product.expiration_alert_days === undefined
+        ? null
+        : Number(product.expiration_alert_days),
+    lotPurchasePrice:
+      product.lot_purchase_price === null || product.lot_purchase_price === undefined
+        ? null
+        : readNumber(product.lot_purchase_price),
     inventoryStatus: product.inventory_status || 'RECEIVED',
     warehouseId: product.warehouse_id ? Number(product.warehouse_id) : null,
     warehouse: product.warehouse || 'Sin almacen',
@@ -500,15 +645,24 @@ function mapProduct(product: ProductApiRecord): ProductRecord {
     status,
     description: product.description || '',
     model: product.model || '',
+    measurement: product.measurement || '',
     physicalLocation: product.physical_location || '',
     isInventory: readBoolean(product.is_inventory, true),
     isService: readBoolean(product.is_service),
     isKit: readBoolean(product.is_kit),
-    allowSale: readBoolean(product.allow_sale, true),
     allowPurchase: readBoolean(product.allow_purchase, true),
-    isFavorite: readBoolean(product.is_favorite),
     notes: product.notes || '',
     observations: product.observations || '',
+    hasWarranty: readBoolean(product.has_warranty),
+    warrantyDuration:
+      product.warranty_duration === null || product.warranty_duration === undefined
+        ? null
+        : readNumber(product.warranty_duration),
+    warrantyPeriodUnit: product.warranty_period_unit || 'DAYS',
+    warrantyType: product.warranty_type || null,
+    priceTiers: product.price_tiers || [],
+    stockByBranch: product.stock_by_branch || [],
+    kitItems: product.kit_items || [],
   };
 }
 
@@ -563,33 +717,51 @@ function toDraft(product: ProductRecord): ProductDraft {
     salePrice: String(product.salePrice),
     taxType: product.taxType,
     taxPercentage: String(product.taxPercentage),
+    maxDiscountType: product.maxDiscountType ?? '',
+    maxDiscountValue: product.maxDiscountValue === null ? '' : String(product.maxDiscountValue),
     cost: String(product.cost),
     stock: String(product.stock),
     minStock: String(product.minStock),
     maxStock: product.maxStock === null ? '' : String(product.maxStock),
     allowNegativeStock: product.allowNegativeStock,
     managesLots: product.managesLots,
-    managesExpiration: product.managesExpiration,
     lotNumber: product.lotNumber,
+    manufacturingDate: product.manufacturingDate,
     expirationDate: product.expirationDate,
+    expirationAlertDays: product.expirationAlertDays === null ? '' : String(product.expirationAlertDays),
+    lotPurchasePrice: product.lotPurchasePrice === null ? '' : String(product.lotPurchasePrice),
     inventoryStatus: product.inventoryStatus,
     warehouseId: product.warehouseId ? String(product.warehouseId) : '',
     warehouse: product.warehouse,
     branchId: product.branchId ? String(product.branchId) : '',
     branch: product.branch,
+    warehouseIds: [],
     status: product.status,
     description: product.description,
     model: product.model,
+    measurement: product.measurement,
     physicalLocation: product.physicalLocation,
     isInventory: product.isInventory,
-    isService: product.isService,
     isKit: product.isKit,
-    allowSale: product.allowSale,
     allowPurchase: product.allowPurchase,
-    isFavorite: product.isFavorite,
     notes: product.notes,
     observations: product.observations,
     imageUrl: product.imageUrl || '',
+    hasWarranty: product.hasWarranty,
+    warrantyDuration: product.warrantyDuration === null ? '' : String(product.warrantyDuration),
+    warrantyPeriodUnit: product.warrantyPeriodUnit,
+    warrantyType: product.warrantyType || '',
+    priceTiers: product.priceTiers.map((tier) => ({
+      key: String(tier.id),
+      priceListName: tier.price_list_name,
+      minQuantity: String(tier.min_quantity),
+      price: String(tier.price),
+    })),
+    kitItems: product.kitItems.map((item) => ({
+      key: String(item.id),
+      productId: String(item.product_id),
+      quantity: String(item.quantity),
+    })),
   };
 }
 
@@ -699,14 +871,16 @@ function Field({
   error,
   label,
   required = false,
+  className = '',
 }: {
   children: ReactNode;
   error?: string;
   label: string;
   required?: boolean;
+  className?: string;
 }) {
   return (
-    <label className="block">
+    <label className={`block ${className}`}>
       <span className="mb-2 block text-sm font-semibold text-black dark:text-white">
         {label}
         {required && <span className="text-red-500"> *</span>}
@@ -798,6 +972,16 @@ function ProductPicture({
 
 const Products = () => {
   const { token, user } = useAuth();
+  // Igual criterio que el backend (ProductController::userCanManageMultipleBranches):
+  // el rol "Administrador" siempre puede, cualquier otro rol necesita el
+  // permiso explicito 'products'/'administrar'. Solo controla si se
+  // MUESTRA la opcion — el backend vuelve a validar todo por su cuenta.
+  const canManageMultipleBranches = Boolean(
+    user?.role?.name?.toLowerCase() === 'administrador' ||
+      user?.role?.permissions?.some(
+        (permission) => permission.module === 'products' && permission.action === 'administrar',
+      ),
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [products, setProducts] = useState<ProductRecord[]>([]);
   const [catalogs, setCatalogs] = useState<CatalogOptions>(emptyCatalogs);
@@ -826,6 +1010,8 @@ const Products = () => {
     null,
   );
   const [draft, setDraft] = useState<ProductDraft>(emptyDraft);
+  const [productImages, setProductImages] = useState<ProductImageMeta[]>([]);
+  const [stagedImages, setStagedImages] = useState<StagedImage[]>([]);
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -892,6 +1078,7 @@ const Products = () => {
         suppliers,
         warehouses,
         branches,
+        priceTypes,
       ] = await Promise.all([
         apiRequest<CatalogResponse>('/catalogs/brands', {}, token),
         apiRequest<CatalogResponse>('/catalogs/categories', {}, token),
@@ -900,6 +1087,7 @@ const Products = () => {
         apiRequest<CatalogResponse>('/relations/suppliers', {}, token),
         apiRequest<CatalogResponse>('/relations/warehouses', {}, token),
         apiRequest<CatalogResponse>('/relations/branches', {}, token),
+        apiRequest<PriceTypesResponse>('/settings/price-types', {}, token),
       ]);
 
       setCatalogs({
@@ -910,6 +1098,7 @@ const Products = () => {
         suppliers: suppliers.data.map(mapCatalogOption),
         warehouses: warehouses.data.map(mapCatalogOption),
         branches: branches.data.map(mapCatalogOption),
+        priceTypes: priceTypes.data,
       });
     } catch (error) {
       setPageError(getErrorMessage(error));
@@ -926,6 +1115,15 @@ const Products = () => {
 
   const selectedProduct = useMemo(
     () => products.find((product) => product.id === selectedProductId) || null,
+    [products, selectedProductId],
+  );
+
+  // Candidatos para componer un combo/kit: cualquier producto de la
+  // empresa, menos otros kits (no se permiten combos anidados, ver
+  // validacion en el backend) y menos el producto que se esta editando
+  // (no puede componerse a si mismo).
+  const availableKitComponents = useMemo(
+    () => products.filter((product) => !product.isKit && product.id !== selectedProductId),
     [products, selectedProductId],
   );
 
@@ -1085,7 +1283,14 @@ const Products = () => {
     if (!draft.brandId) errors.brandId = 'Selecciona marca.';
     if (!draft.purchaseUnitId) errors.purchaseUnitId = 'Selecciona unidad.';
     if (!draft.saleUnitId) errors.saleUnitId = 'Selecciona unidad.';
-    if (!draft.warehouseId) errors.warehouseId = 'Selecciona almacen.';
+    const useMultiBranchInDraft = dialogMode === 'create' && canManageMultipleBranches;
+    if (useMultiBranchInDraft) {
+      if (draft.warehouseIds.length === 0) {
+        errors.warehouseId = 'Selecciona al menos un almacen.';
+      }
+    } else if (!draft.warehouseId) {
+      errors.warehouseId = 'Selecciona almacen.';
+    }
     if (conversionFactor <= 0) {
       errors.conversionFactor = 'Debe ser mayor que cero.';
     }
@@ -1093,7 +1298,7 @@ const Products = () => {
     if (draft.salePrice.trim() === '' || salePrice < 0) {
       errors.salePrice = 'Precio invalido.';
     }
-    if (draft.allowSale && salePrice <= 0) {
+    if (salePrice <= 0) {
       errors.salePrice = 'Debe ser mayor que cero para vender.';
     }
     if (draft.taxType === 'TAXABLE' && draft.taxPercentage.trim() === '') {
@@ -1102,24 +1307,69 @@ const Products = () => {
     if (draft.taxType === 'TAXABLE' && (taxPercentage < 0 || taxPercentage > 100)) {
       errors.taxPercentage = 'Debe estar entre 0 y 100.';
     }
+    const maxDiscountValue =
+      draft.maxDiscountValue.trim() === '' ? null : parseNumber(draft.maxDiscountValue);
+    if (draft.maxDiscountType && maxDiscountValue === null) {
+      errors.maxDiscountValue = 'Ingresa el valor del descuento maximo.';
+    }
+    if (maxDiscountValue !== null && maxDiscountValue < 0) {
+      errors.maxDiscountValue = 'No puede ser negativo.';
+    }
+    if (draft.maxDiscountType === 'PERCENTAGE' && maxDiscountValue !== null && maxDiscountValue > 100) {
+      errors.maxDiscountValue = 'Debe estar entre 0 y 100.';
+    }
     if (stock < 0) errors.stock = 'No puede ser negativo.';
     if (minStock < 0) errors.minStock = 'No puede ser negativo.';
     if (maxStock !== null && maxStock < 0) errors.maxStock = 'No puede ser negativo.';
     if (maxStock !== null && minStock > maxStock) {
       errors.maxStock = 'Debe ser mayor o igual al minimo.';
     }
-    if (draft.isInventory && draft.isService) {
-      errors.isService = 'Servicio e inventariable no pueden estar activos juntos.';
+    if (draft.isKit) {
+      const validItems = draft.kitItems.filter((item) => item.productId.trim() !== '');
+      if (validItems.length === 0) {
+        errors.kitItems = 'Selecciona al menos un producto para armar el combo/kit.';
+      } else if (
+        validItems.some((item) => item.quantity.trim() === '' || parseNumber(item.quantity) <= 0)
+      ) {
+        errors.kitItems = 'Ingresa una cantidad valida (mayor que cero) para cada componente.';
+      } else if (new Set(validItems.map((item) => item.productId)).size !== validItems.length) {
+        errors.kitItems = 'No repitas el mismo producto en varias filas del combo/kit.';
+      }
     }
     if (draft.managesLots && !draft.lotNumber.trim()) {
       errors.lotNumber = 'Ingresa el lote.';
     }
-    if (draft.managesExpiration && !draft.expirationDate) {
-      errors.expirationDate = 'Ingresa la fecha.';
+    if (
+      draft.managesLots &&
+      draft.manufacturingDate &&
+      draft.expirationDate &&
+      draft.expirationDate < draft.manufacturingDate
+    ) {
+      errors.expirationDate = 'No puede ser anterior a la fecha de fabricacion.';
+    }
+    if (
+      draft.managesLots &&
+      draft.expirationAlertDays.trim() !== '' &&
+      parseNumber(draft.expirationAlertDays) <= 0
+    ) {
+      errors.expirationAlertDays = 'Debe ser mayor que cero.';
+    }
+    if (draft.hasWarranty && (!draft.warrantyDuration.trim() || parseNumber(draft.warrantyDuration) <= 0)) {
+      errors.warrantyDuration = 'Ingresa la duracion de la garantia.';
+    }
+
+    // Mismo criterio que el backend: se compara por nombre normalizado
+    // (sin mayusculas ni espacios de sobra), ya que ahora el usuario lo
+    // escribe libre en vez de elegir un id de una lista cerrada.
+    const selectedPriceTypeNames = draft.priceTiers
+      .map((tier) => tier.priceListName.trim().toLowerCase())
+      .filter((name) => name !== '');
+    if (new Set(selectedPriceTypeNames).size !== selectedPriceTypeNames.length) {
+      errors.priceTiers = 'No repitas el mismo tipo de precio en varias filas.';
     }
 
     return errors;
-  }, [dialogMode, draft, products, selectedProductId]);
+  }, [dialogMode, draft, products, selectedProductId, canManageMultipleBranches]);
 
   function updateDraft<K extends keyof ProductDraft>(
     field: K,
@@ -1128,6 +1378,67 @@ const Products = () => {
     setDraft((currentDraft) => ({
       ...currentDraft,
       [field]: value,
+    }));
+  }
+
+  function toggleWarehouseSelection(warehouseId: string) {
+    setDraft((currentDraft) => ({
+      ...currentDraft,
+      warehouseIds: currentDraft.warehouseIds.includes(warehouseId)
+        ? currentDraft.warehouseIds.filter((id) => id !== warehouseId)
+        : [...currentDraft.warehouseIds, warehouseId],
+    }));
+  }
+
+  function addPriceTier() {
+    setDraft((currentDraft) => ({
+      ...currentDraft,
+      priceTiers: [
+        ...currentDraft.priceTiers,
+        { key: `new-${Date.now()}`, priceListName: '', minQuantity: '1', price: '' },
+      ],
+    }));
+  }
+
+  function updatePriceTier(key: string, patch: Partial<PriceTierDraft>) {
+    setDraft((currentDraft) => ({
+      ...currentDraft,
+      priceTiers: currentDraft.priceTiers.map((tier) =>
+        tier.key === key ? { ...tier, ...patch } : tier,
+      ),
+    }));
+  }
+
+  function removePriceTier(key: string) {
+    setDraft((currentDraft) => ({
+      ...currentDraft,
+      priceTiers: currentDraft.priceTiers.filter((tier) => tier.key !== key),
+    }));
+  }
+
+  function addKitItem() {
+    setDraft((currentDraft) => ({
+      ...currentDraft,
+      kitItems: [
+        ...currentDraft.kitItems,
+        { key: `new-${Date.now()}`, productId: '', quantity: '1' },
+      ],
+    }));
+  }
+
+  function updateKitItem(key: string, patch: Partial<KitItemDraft>) {
+    setDraft((currentDraft) => ({
+      ...currentDraft,
+      kitItems: currentDraft.kitItems.map((item) =>
+        item.key === key ? { ...item, ...patch } : item,
+      ),
+    }));
+  }
+
+  function removeKitItem(key: string) {
+    setDraft((currentDraft) => ({
+      ...currentDraft,
+      kitItems: currentDraft.kitItems.filter((item) => item.key !== key),
     }));
   }
 
@@ -1281,6 +1592,9 @@ const Products = () => {
 
   function openCreateDialog() {
     setDraft(createEmptyDraft());
+    revokeStagedImages(stagedImages);
+    setStagedImages([]);
+    setProductImages([]);
     setFormError('');
     setSelectedProductId(null);
     setDialogMode('create');
@@ -1330,6 +1644,9 @@ const Products = () => {
     try {
       const freshProduct = await loadProduct(product.id);
       setDraft(toDraft(freshProduct));
+      setProductImages(freshProduct.images);
+      revokeStagedImages(stagedImages);
+      setStagedImages([]);
       setSelectedProductId(freshProduct.id);
       setDialogMode('edit');
     } catch (error) {
@@ -1374,13 +1691,16 @@ const Products = () => {
 
   async function openProductDialog(
     product: ProductRecord,
-    mode: 'details' | 'kardex',
+    mode: 'kardex',
   ) {
     setActionProductId(product.id);
     setPageError('');
 
     try {
       const freshProduct = await loadProduct(product.id);
+      setProducts((currentProducts) =>
+        currentProducts.map((item) => (item.id === freshProduct.id ? freshProduct : item)),
+      );
       setSelectedProductId(freshProduct.id);
       setDialogMode(mode);
 
@@ -1400,6 +1720,25 @@ const Products = () => {
     setFormError('');
     setKardexRows([]);
     setKardexError('');
+    setProductImages([]);
+    revokeStagedImages(stagedImages);
+    setStagedImages([]);
+  }
+
+  function handleProductImagesChange(images: ProductImageMeta[]) {
+    setProductImages(images);
+
+    if (!selectedProductId) return;
+
+    const primary = images.find((image) => image.is_primary) || images[0] || null;
+
+    setProducts((currentProducts) =>
+      currentProducts.map((item) =>
+        item.id === selectedProductId
+          ? { ...item, images, imageUrl: primary ? primary.url : null }
+          : item,
+      ),
+    );
   }
 
   function productPayload(productDraft: ProductDraft) {
@@ -1431,8 +1770,16 @@ const Products = () => {
       Number(catalogs.units[0]?.id || 0) ||
       null;
     const branchId = Number(productDraft.branchId) || null;
-    const warehouseId =
-      Number(productDraft.warehouseId) || Number(catalogs.warehouses[0]?.id || 0) || null;
+    // Alta en varias sucursales a la vez: solo aplica al crear (no al
+    // editar) y solo si el usuario tiene el permiso. warehouse_id sigue
+    // mandandose siempre (el backend lo exige), como respaldo con el
+    // primero de los seleccionados — pero si warehouse_ids llega con el
+    // permiso puesto, el backend lo prioriza y usa todos.
+    const useMultiBranch =
+      dialogMode === 'create' && canManageMultipleBranches && productDraft.warehouseIds.length > 0;
+    const warehouseId = useMultiBranch
+      ? Number(productDraft.warehouseIds[0])
+      : Number(productDraft.warehouseId) || Number(catalogs.warehouses[0]?.id || 0) || null;
 
     return {
       company_id: Number(productDraft.companyId) || null,
@@ -1443,6 +1790,7 @@ const Products = () => {
       supplier_id: supplierId,
       branch_id: branchId,
       warehouse_id: warehouseId,
+      warehouse_ids: useMultiBranch ? productDraft.warehouseIds.map((id) => Number(id)) : undefined,
       category_id: categoryId,
       subcategory_id: subcategoryId,
       brand_id: brandId,
@@ -1455,6 +1803,11 @@ const Products = () => {
         productDraft.taxType === 'TAXABLE'
           ? parseNumber(productDraft.taxPercentage)
           : 0,
+      max_discount_type: productDraft.maxDiscountType || null,
+      max_discount_value:
+        productDraft.maxDiscountType && productDraft.maxDiscountValue.trim() !== ''
+          ? parseNumber(productDraft.maxDiscountValue)
+          : null,
       cost: parseNumber(productDraft.cost),
       initial_stock: parseNumber(productDraft.stock),
       stock: parseNumber(productDraft.stock),
@@ -1464,22 +1817,47 @@ const Products = () => {
         productDraft.maxStock.trim() === '' ? null : parseNumber(productDraft.maxStock),
       allow_negative_stock: productDraft.allowNegativeStock,
       manages_lots: productDraft.managesLots,
-      manages_expiration: productDraft.managesExpiration,
-      lot_number: productDraft.lotNumber.trim(),
-      expiration_date: productDraft.expirationDate,
+      lot_number: productDraft.managesLots ? productDraft.lotNumber.trim() : null,
+      manufacturing_date:
+        productDraft.managesLots && productDraft.manufacturingDate ? productDraft.manufacturingDate : null,
+      expiration_date: productDraft.managesLots && productDraft.expirationDate ? productDraft.expirationDate : null,
+      expiration_alert_days:
+        productDraft.managesLots && productDraft.expirationAlertDays.trim() !== ''
+          ? parseNumber(productDraft.expirationAlertDays)
+          : null,
+      lot_purchase_price:
+        productDraft.managesLots && productDraft.lotPurchasePrice.trim() !== ''
+          ? parseNumber(productDraft.lotPurchasePrice)
+          : null,
       status: productDraft.status,
       description: productDraft.description.trim(),
       model: productDraft.model.trim(),
+      measurement: productDraft.measurement.trim() || null,
       physical_location: productDraft.physicalLocation.trim(),
       is_inventory: productDraft.isInventory,
-      is_service: productDraft.isService,
       is_kit: productDraft.isKit,
-      allow_sale: productDraft.allowSale,
       allow_purchase: productDraft.allowPurchase,
-      is_favorite: productDraft.isFavorite,
       notes: productDraft.notes.trim(),
       observations: productDraft.observations.trim(),
-      image_url: productDraft.imageUrl.trim(),
+      has_warranty: productDraft.hasWarranty,
+      warranty_duration: productDraft.hasWarranty ? parseNumber(productDraft.warrantyDuration) : null,
+      warranty_period_unit: productDraft.warrantyPeriodUnit,
+      warranty_type: productDraft.hasWarranty ? productDraft.warrantyType.trim() || null : null,
+      price_tiers: productDraft.priceTiers
+        .filter((tier) => tier.priceListName.trim() !== '' && tier.price.trim() !== '')
+        .map((tier) => ({
+          price_list_name: tier.priceListName.trim(),
+          min_quantity: parseNumber(tier.minQuantity) || 1,
+          price: parseNumber(tier.price),
+        })),
+      kit_items: productDraft.isKit
+        ? productDraft.kitItems
+            .filter((item) => item.productId.trim() !== '')
+            .map((item) => ({
+              product_id: Number(item.productId),
+              quantity: parseNumber(item.quantity),
+            }))
+        : [],
     };
   }
 
@@ -1500,6 +1878,30 @@ const Products = () => {
     return mapProduct(response.product);
   }
 
+  async function uploadStagedImages(productId: number, staged: StagedImage[]): Promise<string> {
+    if (!token || staged.length === 0) return '';
+
+    // Se suben una por una (no en paralelo) para respetar el orden elegido:
+    // la primera que llega al backend queda marcada como principal.
+    const failures: string[] = [];
+
+    for (const item of staged) {
+      try {
+        const formData = new FormData();
+        formData.append('image', item.file);
+        await apiRequest(`/products/${productId}/images`, { method: 'POST', body: formData }, token);
+      } catch (err) {
+        failures.push(getErrorMessage(err));
+      }
+    }
+
+    revokeStagedImages(staged);
+
+    return failures.length > 0
+      ? ` Se guardo el producto, pero ${failures.length} imagen(es) no se pudieron subir: ${failures[0]}`
+      : '';
+  }
+
   async function saveProduct(createAnother = false) {
     const firstError = Object.values(draftErrors)[0];
 
@@ -1512,16 +1914,24 @@ const Products = () => {
     setFormError('');
 
     try {
-      await persistProduct(
+      const isCreate = dialogMode !== 'edit';
+      const savedProduct = await persistProduct(
         draft,
         dialogMode === 'edit' ? selectedProductId || undefined : undefined,
       );
+
+      let imageWarning = '';
+      if (isCreate && stagedImages.length > 0) {
+        imageWarning = await uploadStagedImages(savedProduct.id, stagedImages);
+        setStagedImages([]);
+      }
+
       await loadProducts();
       await loadCatalogs();
       setNotice(
-        dialogMode === 'edit'
+        (dialogMode === 'edit'
           ? 'Producto actualizado en la base de datos.'
-          : 'Producto creado en la base de datos.',
+          : 'Producto creado en la base de datos.') + imageWarning,
       );
 
       if (createAnother && dialogMode === 'create') {
@@ -2085,7 +2495,12 @@ const Products = () => {
                             {
                               label: 'Ver detalle',
                               icon: FiEye,
-                              onClick: () => void openProductDialog(product, 'details'),
+                              // Se abre en una pestana nueva, ocupando toda
+                              // la pantalla (ruta completa, no un modal),
+                              // para poder ver el carrusel de imagenes y la
+                              // disponibilidad por sucursal con mas espacio.
+                              onClick: () =>
+                                window.open(`/products/detail/${product.id}`, '_blank', 'noopener,noreferrer'),
                             },
                             {
                               label: 'Editar',
@@ -2232,13 +2647,6 @@ const Products = () => {
             <div className="space-y-5">
               <FormCard title="Informacion general">
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-                  <Field label="Empresa">
-                    <input
-                      value={draft.company}
-                      readOnly
-                      className={`${inputClass} bg-gray-50 dark:bg-meta-4`}
-                    />
-                  </Field>
                   <Field label="Codigo interno" required error={draftErrors.code}>
                     <input
                       value={draft.code}
@@ -2281,6 +2689,14 @@ const Products = () => {
                       onChange={(event) => updateDraft('model', event.target.value)}
                       className={inputClass}
                       placeholder="HILUX 2016-2024"
+                    />
+                  </Field>
+                  <Field label="Medida">
+                    <input
+                      value={draft.measurement}
+                      onChange={(event) => updateDraft('measurement', event.target.value)}
+                      className={inputClass}
+                      placeholder='Formato libre, ej. 30x34x12 o "Altura: 30cm, Largo: 66cm, Grosor: 5cm"'
                     />
                   </Field>
                   <Field
@@ -2374,16 +2790,6 @@ const Products = () => {
                       label="Estado"
                     />
                   </Field>
-                  <Field label="Imagen URL">
-                    <input
-                      value={draft.imageUrl}
-                      onChange={(event) =>
-                        updateDraft('imageUrl', event.target.value)
-                      }
-                      className={inputClass}
-                      placeholder="/storage/productos/alternador.png"
-                    />
-                  </Field>
                   <div className="md:col-span-2 xl:col-span-3">
                     <Field label="Descripcion">
                       <textarea
@@ -2397,17 +2803,14 @@ const Products = () => {
                     </Field>
                   </div>
                   <div className="md:col-span-2 xl:col-span-3">
-                    <div className="flex min-h-32 items-center justify-center rounded-lg border border-dashed border-stroke bg-gray-50 p-4 dark:border-strokedark dark:bg-meta-4">
-                      {draft.imageUrl ? (
-                        <img
-                          src={draft.imageUrl}
-                          alt={draft.name || 'Producto'}
-                          className="max-h-40 w-full object-contain"
-                        />
-                      ) : (
-                        <FiImage className="h-10 w-10 text-slate-400" />
-                      )}
-                    </div>
+                    <ProductImagesManager
+                      productId={dialogMode === 'edit' ? selectedProductId : null}
+                      images={productImages}
+                      onImagesChange={handleProductImagesChange}
+                      stagedImages={stagedImages}
+                      onStagedImagesChange={setStagedImages}
+                      token={token}
+                    />
                   </div>
                 </div>
               </FormCard>
@@ -2508,7 +2911,7 @@ const Products = () => {
                   >
                     <input
                       type="number"
-                      min={draft.allowSale ? '0.01' : '0'}
+                      min="0.01"
                       step="0.01"
                       value={draft.salePrice}
                       onChange={(event) =>
@@ -2561,6 +2964,51 @@ const Products = () => {
                     </Field>
                   )}
                 </div>
+                <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+                  <Field label="Descuento maximo">
+                    <SelectWrap>
+                      <select
+                        value={draft.maxDiscountType}
+                        onChange={(event) => {
+                          const nextType = normalizeMaxDiscountType(event.target.value) ?? '';
+                          setDraft((currentDraft) => ({
+                            ...currentDraft,
+                            maxDiscountType: nextType,
+                            maxDiscountValue: nextType === '' ? '' : currentDraft.maxDiscountValue,
+                          }));
+                        }}
+                        className={selectClass}
+                      >
+                        <option value="">Sin limite propio</option>
+                        <option value="PERCENTAGE">Porcentaje</option>
+                        <option value="FIXED">Monto fijo por unidad</option>
+                      </select>
+                    </SelectWrap>
+                  </Field>
+                  {draft.maxDiscountType && (
+                    <Field
+                      label={draft.maxDiscountType === 'PERCENTAGE' ? 'Descuento maximo (%)' : 'Descuento maximo (C$ por unidad)'}
+                      required
+                      error={draftErrors.maxDiscountValue}
+                    >
+                      <input
+                        type="number"
+                        min="0"
+                        max={draft.maxDiscountType === 'PERCENTAGE' ? '100' : undefined}
+                        step="0.01"
+                        value={draft.maxDiscountValue}
+                        onChange={(event) => updateDraft('maxDiscountValue', event.target.value)}
+                        className={inputClass}
+                        placeholder={draft.maxDiscountType === 'PERCENTAGE' ? '10' : '20'}
+                      />
+                    </Field>
+                  )}
+                </div>
+                <p className="mt-3 text-xs text-slate-500">
+                  Al facturar este producto, ningun descuento por linea podra superar este limite (se valida junto
+                  con el tope general de Configuracion General y el limite personal del vendedor: gana el mas
+                  restrictivo). Dejalo en "Sin limite propio" para que el producto herede el tope general.
+                </p>
                 <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
                   {[
                     ['Precio Base', formatCurrency(previewSalePrice)],
@@ -2582,48 +3030,171 @@ const Products = () => {
                 </div>
               </FormCard>
 
+              <FormCard title="Precios por Volumen">
+                <p className="mb-4 text-sm text-slate-500">
+                  Precios adicionales que aplican a partir de cierta cantidad (mayoreo, distribuidor, etc.). Se
+                  validan al vender: no se puede vender por debajo del precio que corresponde a la cantidad.
+                </p>
+                {draftErrors.priceTiers && (
+                  <p className="mb-4 text-xs font-semibold text-red-500">{draftErrors.priceTiers}</p>
+                )}
+                {/* Sugerencias para el input de "Tipo de precio" de abajo:
+                    nombres ya usados antes (propios de la empresa), pero el
+                    usuario puede escribir cualquier otro nombre nuevo. */}
+                <datalist id="price-type-suggestions">
+                  {catalogs.priceTypes
+                    .filter((priceType) => priceType.is_active)
+                    .map((priceType) => (
+                      <option key={priceType.id} value={priceType.name} />
+                    ))}
+                </datalist>
+                <div className="space-y-3">
+                  {draft.priceTiers.map((tier) => (
+                    <div
+                      key={tier.key}
+                      className="grid grid-cols-1 gap-3 rounded-lg border border-stroke p-3 dark:border-strokedark md:grid-cols-[2fr_1fr_1fr_auto] md:items-end md:border-0 md:p-0"
+                    >
+                      <Field label="Tipo de precio">
+                        {/* Texto libre (no un catalogo cerrado): el usuario
+                            lo nombra como quiera. El <datalist> solo
+                            sugiere los nombres ya usados antes (propios) —
+                            no impide escribir uno nuevo. */}
+                        <input
+                          list="price-type-suggestions"
+                          value={tier.priceListName}
+                          onChange={(event) => updatePriceTier(tier.key, { priceListName: event.target.value })}
+                          className={inputClass}
+                          placeholder="Ej. Mayorista, Distribuidor..."
+                        />
+                      </Field>
+                      <Field label="Cantidad minima">
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={tier.minQuantity}
+                          onChange={(event) => updatePriceTier(tier.key, { minQuantity: event.target.value })}
+                          className={inputClass}
+                          placeholder="10"
+                        />
+                      </Field>
+                      <Field label="Precio">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={tier.price}
+                          onChange={(event) => updatePriceTier(tier.key, { price: event.target.value })}
+                          className={inputClass}
+                          placeholder="180"
+                        />
+                      </Field>
+                      <button
+                        type="button"
+                        onClick={() => removePriceTier(tier.key)}
+                        className="inline-flex h-12 w-12 items-center justify-center rounded-lg border border-stroke text-red-500 hover:border-red-500 dark:border-strokedark"
+                        aria-label="Quitar precio por volumen"
+                      >
+                        <FiTrash2 className="h-5 w-5" />
+                      </button>
+                    </div>
+                  ))}
+                  {draft.priceTiers.length === 0 && (
+                    <p className="rounded-lg border border-dashed border-stroke px-4 py-6 text-center text-sm text-slate-500 dark:border-strokedark">
+                      No hay precios por volumen configurados.
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={addPriceTier}
+                  className="mt-4 inline-flex items-center gap-2 rounded-lg border border-stroke px-4 py-2.5 text-sm font-semibold text-black hover:border-primary hover:text-primary dark:border-strokedark dark:text-white"
+                >
+                  <FiPlus className="h-4 w-4" /> Agregar precio por volumen
+                </button>
+              </FormCard>
+
               <FormCard title="Inventario">
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
-                  <Field label="Sucursal">
-                    <SelectWrap>
-                      <select
-                        value={draft.branchId}
-                        onChange={(event) => handleBranchChange(event.target.value)}
-                        className={selectClass}
-                        disabled={loadingCatalogs}
+                  {dialogMode === 'create' && canManageMultipleBranches ? (
+                    <Field
+                      label="Sucursales / almacenes"
+                      required
+                      error={draftErrors.warehouseId}
+                      className="md:col-span-2 xl:col-span-2"
+                    >
+                      <div className="rounded-lg border border-stroke p-3 dark:border-strokedark">
+                        <p className="mb-2 text-xs text-slate-500">
+                          Marca uno o varios: el stock inicial se registra en cada sucursal elegida, con su propio
+                          movimiento de kardex.
+                        </p>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          {catalogs.warehouses.map((warehouse) => (
+                            <label
+                              key={warehouse.id}
+                              className="flex items-center gap-2 rounded-lg border border-stroke px-3 py-2 text-sm dark:border-strokedark"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={draft.warehouseIds.includes(String(warehouse.id))}
+                                onChange={() => toggleWarehouseSelection(String(warehouse.id))}
+                                className="h-4 w-4"
+                              />
+                              <span className="text-black dark:text-white">
+                                {warehouse.name}
+                                {warehouse.branch_name && (
+                                  <span className="text-slate-500"> ({warehouse.branch_name})</span>
+                                )}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </Field>
+                  ) : (
+                    <>
+                      <Field label="Sucursal">
+                        <SelectWrap>
+                          <select
+                            value={draft.branchId}
+                            onChange={(event) => handleBranchChange(event.target.value)}
+                            className={selectClass}
+                            disabled={loadingCatalogs}
+                          >
+                            <option value="">Sin sucursal</option>
+                            {catalogs.branches.map((branch) => (
+                              <option key={branch.id} value={branch.id}>
+                                {branch.name}
+                              </option>
+                            ))}
+                          </select>
+                        </SelectWrap>
+                      </Field>
+                      <Field
+                        label="Almacen inicial"
+                        required
+                        error={draftErrors.warehouseId}
                       >
-                        <option value="">Sin sucursal</option>
-                        {catalogs.branches.map((branch) => (
-                          <option key={branch.id} value={branch.id}>
-                            {branch.name}
-                          </option>
-                        ))}
-                      </select>
-                    </SelectWrap>
-                  </Field>
-                  <Field
-                    label="Almacen inicial"
-                    required
-                    error={draftErrors.warehouseId}
-                  >
-                    <SelectWrap>
-                      <select
-                        value={draft.warehouseId}
-                        onChange={(event) =>
-                          handleWarehouseChange(event.target.value)
-                        }
-                        className={selectClass}
-                        disabled={loadingCatalogs}
-                      >
-                        <option value="" disabled hidden>Selecciona almacen</option>
-                        {availableWarehouses.map((warehouse) => (
-                          <option key={warehouse.id} value={warehouse.id}>
-                            {warehouse.name}
-                          </option>
-                        ))}
-                      </select>
-                    </SelectWrap>
-                  </Field>
+                        <SelectWrap>
+                          <select
+                            value={draft.warehouseId}
+                            onChange={(event) =>
+                              handleWarehouseChange(event.target.value)
+                            }
+                            className={selectClass}
+                            disabled={loadingCatalogs}
+                          >
+                            <option value="" disabled hidden>Selecciona almacen</option>
+                            {availableWarehouses.map((warehouse) => (
+                              <option key={warehouse.id} value={warehouse.id}>
+                                {warehouse.name}
+                              </option>
+                            ))}
+                          </select>
+                        </SelectWrap>
+                      </Field>
+                    </>
+                  )}
                   <Field label="Estado inventario">
                     <SelectWrap>
                       <select
@@ -2658,6 +3229,33 @@ const Products = () => {
                       className={inputClass}
                     />
                   </Field>
+                  {dialogMode === 'edit' && draft.stockByBranch.length > 0 && (
+                    <div className="md:col-span-2 xl:col-span-3">
+                      <span className="mb-2 block text-sm font-semibold text-black dark:text-white">
+                        Disponibilidad por sucursal
+                      </span>
+                      <div className="overflow-x-auto rounded-lg border border-stroke dark:border-strokedark">
+                        <table className="min-w-full text-left text-sm">
+                          <thead className="bg-slate-50 dark:bg-white/5">
+                            <tr className="text-xs font-bold uppercase text-slate-500">
+                              <th className="px-3 py-2">Sucursal</th>
+                              <th className="px-3 py-2 text-right">Existencia</th>
+                              <th className="px-3 py-2 text-right">Disponible</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {draft.stockByBranch.map((row) => (
+                              <tr key={row.branch_id ?? row.branch_name} className="border-t border-stroke dark:border-strokedark">
+                                <td className="px-3 py-2">{row.branch_name}</td>
+                                <td className="px-3 py-2 text-right">{row.quantity}</td>
+                                <td className="px-3 py-2 text-right font-semibold">{row.available_quantity}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                   <Field
                     label="Alerta existencia minima"
                     required
@@ -2701,39 +3299,71 @@ const Products = () => {
                     checked={draft.managesLots}
                     onChange={(checked) => updateDraft('managesLots', checked)}
                   />
-                  <ToggleField
-                    label="Maneja vencimiento"
-                    checked={draft.managesExpiration}
-                    onChange={(checked) =>
-                      updateDraft('managesExpiration', checked)
-                    }
-                  />
                   {draft.managesLots && (
-                    <Field label="Numero de lote" required error={draftErrors.lotNumber}>
-                      <input
-                        value={draft.lotNumber}
-                        onChange={(event) =>
-                          updateDraft('lotNumber', event.target.value)
-                        }
-                        className={inputClass}
-                      />
-                    </Field>
-                  )}
-                  {draft.managesExpiration && (
-                    <Field
-                      label="Fecha de vencimiento"
-                      required
-                      error={draftErrors.expirationDate}
-                    >
-                      <input
-                        type="date"
-                        value={draft.expirationDate}
-                        onChange={(event) =>
-                          updateDraft('expirationDate', event.target.value)
-                        }
-                        className={inputClass}
-                      />
-                    </Field>
+                    <>
+                      <Field label="Numero de lote" required error={draftErrors.lotNumber}>
+                        <input
+                          value={draft.lotNumber}
+                          onChange={(event) =>
+                            updateDraft('lotNumber', event.target.value)
+                          }
+                          className={inputClass}
+                          placeholder="Ej. L-2026-045"
+                        />
+                      </Field>
+                      <Field label="Fecha de fabricacion">
+                        <input
+                          type="date"
+                          value={draft.manufacturingDate}
+                          onChange={(event) =>
+                            updateDraft('manufacturingDate', event.target.value)
+                          }
+                          className={inputClass}
+                        />
+                      </Field>
+                      <Field
+                        label="Fecha de vencimiento"
+                        error={draftErrors.expirationDate}
+                      >
+                        <input
+                          type="date"
+                          value={draft.expirationDate}
+                          onChange={(event) =>
+                            updateDraft('expirationDate', event.target.value)
+                          }
+                          className={inputClass}
+                        />
+                      </Field>
+                      <Field
+                        label="Alertar antes de vencer (dias)"
+                        error={draftErrors.expirationAlertDays}
+                      >
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={draft.expirationAlertDays}
+                          onChange={(event) =>
+                            updateDraft('expirationAlertDays', event.target.value)
+                          }
+                          className={inputClass}
+                          placeholder="Ej. 30"
+                        />
+                      </Field>
+                      <Field label="Precio de compra del lote">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={draft.lotPurchasePrice}
+                          onChange={(event) =>
+                            updateDraft('lotPurchasePrice', event.target.value)
+                          }
+                          className={inputClass}
+                          placeholder="Si difiere del costo del producto"
+                        />
+                      </Field>
+                    </>
                   )}
                 </div>
               </FormCard>
@@ -2751,6 +3381,57 @@ const Products = () => {
                 </Field>
               </FormCard>
 
+              <FormCard title="Garantia">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <ToggleField
+                    label="Este producto tiene garantia"
+                    checked={draft.hasWarranty}
+                    onChange={(checked) => updateDraft('hasWarranty', checked)}
+                  />
+                  {draft.hasWarranty && (
+                    <>
+                      <Field label="Duracion" required error={draftErrors.warrantyDuration}>
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={draft.warrantyDuration}
+                          onChange={(event) => updateDraft('warrantyDuration', event.target.value)}
+                          className={inputClass}
+                        />
+                      </Field>
+                      <Field label="Unidad">
+                        <select
+                          value={draft.warrantyPeriodUnit}
+                          onChange={(event) =>
+                            updateDraft('warrantyPeriodUnit', event.target.value as WarrantyPeriodUnit)
+                          }
+                          className={selectClass}
+                        >
+                          <option value="DAYS">Dias</option>
+                          <option value="MONTHS">Meses</option>
+                          <option value="YEARS">Anos</option>
+                        </select>
+                      </Field>
+                      <Field label="Tipo de garantia">
+                        <input
+                          value={draft.warrantyType}
+                          onChange={(event) => updateDraft('warrantyType', event.target.value)}
+                          className={inputClass}
+                          placeholder="Ej. Garantia de fabrica"
+                        />
+                      </Field>
+                    </>
+                  )}
+                </div>
+                {draft.hasWarranty && (
+                  <p className="mt-2 text-xs text-slate-500">
+                    Al vender este producto, la garantia empieza a correr desde la fecha de la venta: la factura
+                    mostrara hasta cuando queda vigente.
+                  </p>
+                )}
+              </FormCard>
+
               <FormCard title="Configuraciones">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                   <ToggleField
@@ -2760,48 +3441,100 @@ const Products = () => {
                       setDraft((currentDraft) => ({
                         ...currentDraft,
                         isInventory: checked,
-                        isService: checked ? false : currentDraft.isService,
-                      }))
-                    }
-                  />
-                  <ToggleField
-                    label="Servicio"
-                    checked={draft.isService}
-                    onChange={(checked) =>
-                      setDraft((currentDraft) => ({
-                        ...currentDraft,
-                        isService: checked,
-                        isInventory: checked ? false : currentDraft.isInventory,
+                        isKit: checked ? false : currentDraft.isKit,
                       }))
                     }
                   />
                   <ToggleField
                     label="Combo / Kit"
                     checked={draft.isKit}
-                    onChange={(checked) => updateDraft('isKit', checked)}
-                  />
-                  <ToggleField
-                    label="Permitir venta"
-                    checked={draft.allowSale}
-                    onChange={(checked) => updateDraft('allowSale', checked)}
+                    onChange={(checked) =>
+                      setDraft((currentDraft) => ({
+                        ...currentDraft,
+                        isKit: checked,
+                        isInventory: checked ? false : currentDraft.isInventory,
+                      }))
+                    }
                   />
                   <ToggleField
                     label="Permitir compra"
                     checked={draft.allowPurchase}
                     onChange={(checked) => updateDraft('allowPurchase', checked)}
                   />
-                  <ToggleField
-                    label="Producto favorito"
-                    checked={draft.isFavorite}
-                    onChange={(checked) => updateDraft('isFavorite', checked)}
-                  />
-                  {draftErrors.isService && (
-                    <p className="text-sm font-semibold text-red-500 md:col-span-2 xl:col-span-3">
-                      {draftErrors.isService}
-                    </p>
-                  )}
                 </div>
+                <p className="mt-3 text-xs text-slate-500">
+                  Si "Producto inventariable" y "Combo / Kit" quedan los dos apagados, el producto se trata como
+                  servicio (no lleva existencia propia).
+                </p>
               </FormCard>
+
+              {draft.isKit && (
+                <FormCard title="Componentes del combo/kit">
+                  <p className="mb-4 text-sm text-slate-500">
+                    Que otros productos de la empresa componen este combo/kit, y cuantos de cada uno. Al vender
+                    este producto se descuenta el inventario de cada componente (no el del kit); al anular la
+                    venta, se devuelve.
+                  </p>
+                  {draftErrors.kitItems && (
+                    <p className="mb-4 text-xs font-semibold text-red-500">{draftErrors.kitItems}</p>
+                  )}
+                  <div className="space-y-3">
+                    {draft.kitItems.map((item) => (
+                      <div
+                        key={item.key}
+                        className="grid grid-cols-1 gap-3 rounded-lg border border-stroke p-3 dark:border-strokedark md:grid-cols-[3fr_1fr_auto] md:items-end md:border-0 md:p-0"
+                      >
+                        <Field label="Producto">
+                          <SelectWrap>
+                            <select
+                              value={item.productId}
+                              onChange={(event) => updateKitItem(item.key, { productId: event.target.value })}
+                              className={selectClass}
+                            >
+                              <option value="" disabled hidden>Selecciona un producto</option>
+                              {availableKitComponents.map((product) => (
+                                <option key={product.id} value={product.id}>
+                                  {product.code} - {product.name}
+                                </option>
+                              ))}
+                            </select>
+                          </SelectWrap>
+                        </Field>
+                        <Field label="Cantidad">
+                          <input
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            value={item.quantity}
+                            onChange={(event) => updateKitItem(item.key, { quantity: event.target.value })}
+                            className={inputClass}
+                          />
+                        </Field>
+                        <button
+                          type="button"
+                          onClick={() => removeKitItem(item.key)}
+                          className="inline-flex h-12 w-12 items-center justify-center rounded-lg border border-stroke text-red-500 hover:border-red-500 dark:border-strokedark"
+                          aria-label="Quitar componente del combo/kit"
+                        >
+                          <FiTrash2 className="h-5 w-5" />
+                        </button>
+                      </div>
+                    ))}
+                    {draft.kitItems.length === 0 && (
+                      <p className="rounded-lg border border-dashed border-stroke px-4 py-6 text-center text-sm text-slate-500 dark:border-strokedark">
+                        No hay componentes configurados.
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addKitItem}
+                    className="mt-4 inline-flex items-center gap-2 rounded-lg border border-stroke px-4 py-2.5 text-sm font-semibold text-black hover:border-primary hover:text-primary dark:border-strokedark dark:text-white"
+                  >
+                    <FiPlus className="h-4 w-4" /> Agregar componente
+                  </button>
+                </FormCard>
+              )}
 
               <FormCard title="Observaciones">
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
@@ -2854,71 +3587,6 @@ const Products = () => {
               </button>
             </div>
           </form>
-        </div>
-      )}
-
-      {dialogMode === 'details' && selectedProduct && (
-        <div className="fixed inset-0 z-99999 flex items-center justify-center bg-black/50 px-4 py-6">
-          <div className="w-full max-w-3xl rounded-lg border border-stroke bg-white p-6 shadow-default dark:border-strokedark dark:bg-boxdark">
-            <div className="mb-6 flex items-start justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <ProductPicture
-                  product={selectedProduct}
-                  onOpen={() => setImagePreviewProduct(selectedProduct)}
-                />
-                <div>
-                  <p className="text-xl font-black text-black dark:text-white">
-                    {selectedProduct.name}
-                  </p>
-                  <p className="mt-2 text-sm font-semibold text-primary">
-                    {selectedProduct.code}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={closeDialog}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-stroke text-black transition hover:border-red-500 hover:text-red-500 dark:border-strokedark dark:text-white"
-              >
-                <FiX className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {[
-                ['Categoria', selectedProduct.category],
-                ['Subcategoria', selectedProduct.subcategory || 'Sin subcategoria'],
-                ['Marca', selectedProduct.brand],
-                ['Unidad', selectedProduct.unit],
-                ['Estado', selectedProduct.status],
-                ['Precio venta', formatCurrency(selectedProduct.salePrice)],
-                ['Costo', formatCurrency(selectedProduct.cost)],
-                ['Stock', formatQuantity(selectedProduct.stock)],
-                ['Stock minimo', formatQuantity(selectedProduct.minStock)],
-              ].map(([label, value]) => (
-                <div
-                  key={label}
-                  className="rounded-lg border border-stroke px-4 py-3 dark:border-strokedark"
-                >
-                  <p className="text-xs font-bold uppercase text-slate-500">
-                    {label}
-                  </p>
-                  <p className="mt-2 text-sm font-black text-black dark:text-white">
-                    {value}
-                  </p>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 rounded-lg border border-stroke px-4 py-3 dark:border-strokedark">
-              <p className="text-xs font-bold uppercase text-slate-500">
-                Descripcion
-              </p>
-              <p className="mt-2 text-sm font-semibold text-black dark:text-white">
-                {selectedProduct.description || 'Sin descripcion registrada.'}
-              </p>
-            </div>
-          </div>
         </div>
       )}
 

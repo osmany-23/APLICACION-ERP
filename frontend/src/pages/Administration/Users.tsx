@@ -18,6 +18,7 @@ type FormState = {
   branch_id: string;
   password: string;
   status: boolean;
+  max_discount_percentage: string;
 };
 
 type FormErrors = Partial<Record<keyof FormState, string>>;
@@ -31,6 +32,7 @@ const emptyForm: FormState = {
   branch_id: '',
   password: '',
   status: true,
+  max_discount_percentage: '',
 };
 
 function normalizeText(value: string) {
@@ -145,6 +147,12 @@ export default function UsersPage() {
     if (state.email.trim() && !/^\S+@\S+\.\S+$/.test(state.email.trim())) {
       validation.email = 'Ingresa un correo valido.';
     }
+    if (state.max_discount_percentage.trim() !== '') {
+      const percentage = Number(state.max_discount_percentage);
+      if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) {
+        validation.max_discount_percentage = 'Debe estar entre 0 y 100.';
+      }
+    }
 
     return validation;
   }
@@ -168,6 +176,7 @@ export default function UsersPage() {
       branch_id: item.branch_id ? String(item.branch_id) : '',
       password: '',
       status: item.status === 1,
+      max_discount_percentage: item.max_discount_percentage !== null ? String(item.max_discount_percentage) : '',
     });
     setEditing(item);
     setFormErrors({});
@@ -205,6 +214,7 @@ export default function UsersPage() {
         phone: form.phone.trim() || null,
         role_id: form.role_id ? Number(form.role_id) : null,
         branch_id: form.branch_id ? Number(form.branch_id) : null,
+        max_discount_percentage: form.max_discount_percentage.trim() !== '' ? Number(form.max_discount_percentage) : null,
       };
 
       if (!editing) {
@@ -512,6 +522,18 @@ export default function UsersPage() {
                   ))}
                 </select>
               </Field>
+              <Field label="Descuento maximo (%)" error={formErrors.max_discount_percentage}>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={form.max_discount_percentage}
+                  onChange={(event) => updateForm('max_discount_percentage', event.target.value)}
+                  className={inputClass}
+                  placeholder="Sin limite"
+                />
+              </Field>
               {!editing && (
                 <Field label="Contrasena" error={formErrors.password}>
                   <input type="password" value={form.password} onChange={(event) => updateForm('password', event.target.value)} className={inputClass} placeholder="Minimo 8 caracteres" />
@@ -523,6 +545,12 @@ export default function UsersPage() {
                 </Field>
               )}
             </div>
+
+            <p className="mt-4 text-xs text-slate-500">
+              El descuento maximo limita cuanto puede rebajar este usuario al facturar (se valida junto con el
+              limite propio de cada producto, si tiene uno: gana el mas restrictivo). Dejalo vacio para no
+              imponerle un limite personal.
+            </p>
 
             {editing && editing.id === currentUser?.id && (
               <p className="mt-4 text-xs text-slate-500">

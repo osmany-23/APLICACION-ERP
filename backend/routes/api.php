@@ -1,24 +1,34 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CashMovementController;
+use App\Http\Controllers\CashMovementReasonController;
+use App\Http\Controllers\CashRegisterController;
+use App\Http\Controllers\CashSessionController;
 use App\Http\Controllers\CountryController;
+use App\Http\Controllers\CreditNoteController;
 use App\Http\Controllers\CurrencyController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DebitNoteController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DocumentTypeController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\ImageController;
 use App\Http\Controllers\GeneralSettingsController;
 use App\Http\Controllers\PaymentMethodController;
 use App\Http\Controllers\PaymentTermController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\PosPinController;
 use App\Http\Controllers\PositionController;
+use App\Http\Controllers\PriceListController;
 use App\Http\Controllers\ProductCatalogController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\RelationController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SaleController;
+use App\Http\Controllers\TerminalController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -42,7 +52,15 @@ Route::prefix('auth')->group(function () {
 
 Route::get('/public/branding', [GeneralSettingsController::class, 'publicBranding']);
 
+// Publica a proposito: un <img src="..."> no puede mandar el header
+// Authorization Bearer que usa el resto de la API. El UUID es
+// impredecible, ver el comentario en ImageController::show().
+Route::get('/images/{uuid}', [ImageController::class, 'show'])
+    ->where('uuid', '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}');
+
 Route::middleware('erp.auth')->group(function () {
+    Route::get('/dashboard/analytics', [DashboardController::class, 'analytics']);
+
     Route::get('/relations/suppliers/payment-terms', [RelationController::class, 'paymentTerms']);
 
     Route::prefix('settings')->group(function () {
@@ -80,6 +98,12 @@ Route::middleware('erp.auth')->group(function () {
         Route::put('/document-types/{id}', [DocumentTypeController::class, 'update'])->whereNumber('id');
         Route::patch('/document-types/{id}/status', [DocumentTypeController::class, 'updateStatus'])->whereNumber('id');
         Route::delete('/document-types/{id}', [DocumentTypeController::class, 'destroy'])->whereNumber('id');
+
+        Route::get('/price-types', [PriceListController::class, 'index']);
+        Route::post('/price-types', [PriceListController::class, 'store']);
+        Route::put('/price-types/{id}', [PriceListController::class, 'update'])->whereNumber('id');
+        Route::patch('/price-types/{id}/status', [PriceListController::class, 'updateStatus'])->whereNumber('id');
+        Route::delete('/price-types/{id}', [PriceListController::class, 'destroy'])->whereNumber('id');
     });
 
     Route::prefix('catalogs/{catalog}')
@@ -91,6 +115,8 @@ Route::middleware('erp.auth')->group(function () {
             Route::put('/{id}', 'update')->whereNumber('id');
             Route::patch('/{id}/status', 'updateStatus')->whereNumber('id');
             Route::delete('/{id}', 'destroy')->whereNumber('id');
+            Route::post('/{id}/image', 'uploadImage')->whereNumber('id');
+            Route::delete('/{id}/image', 'deleteImage')->whereNumber('id');
         });
 
     Route::prefix('relations/{relation}')
@@ -110,6 +136,12 @@ Route::middleware('erp.auth')->group(function () {
         ->only(['index', 'show', 'store', 'update', 'destroy']);
     Route::patch('/products/{product}/status', [ProductController::class, 'updateStatus'])
         ->whereNumber('product');
+    Route::post('/products/{product}/images', [ProductController::class, 'storeImage'])
+        ->whereNumber('product');
+    Route::delete('/products/{product}/images/{image}', [ProductController::class, 'destroyImage'])
+        ->whereNumber(['product', 'image']);
+    Route::post('/products/{product}/images/{image}/primary', [ProductController::class, 'setPrimaryImage'])
+        ->whereNumber(['product', 'image']);
 
     Route::prefix('customers')
         ->controller(CustomerController::class)
@@ -126,12 +158,18 @@ Route::middleware('erp.auth')->group(function () {
         ->controller(SaleController::class)
         ->group(function () {
             Route::get('/', 'index');
+            Route::get('/exchange-rate', 'exchangeRate');
+            Route::get('/receipt-config', 'receiptConfig');
             Route::get('/{sale}', 'show')->whereNumber('sale');
             Route::post('/', 'store');
             Route::put('/{sale}', 'update')->whereNumber('sale');
             Route::post('/{sale}/confirm', 'confirm')->whereNumber('sale');
+            Route::post('/{sale}/payments', 'registerPayment')->whereNumber('sale');
             Route::post('/{sale}/cancel', 'cancel')->whereNumber('sale');
         });
+
+    Route::post('/sales/{sale}/credit-notes', [CreditNoteController::class, 'store'])->whereNumber('sale');
+    Route::post('/sales/{sale}/debit-notes', [DebitNoteController::class, 'store'])->whereNumber('sale');
 
     Route::prefix('purchases')
         ->controller(PurchaseController::class)
@@ -204,4 +242,57 @@ Route::middleware('erp.auth')->group(function () {
         });
 
     Route::post('/pos/pin/resolve', [PosPinController::class, 'resolve']);
+
+    // Modulo de Apertura de Caja (POS).
+    Route::prefix('terminals')
+        ->controller(TerminalController::class)
+        ->group(function () {
+            Route::get('/', 'index');
+            Route::post('/checkin', 'checkin');
+            Route::put('/{id}', 'update')->whereNumber('id');
+            Route::delete('/{id}', 'destroy')->whereNumber('id');
+        });
+
+    Route::prefix('cash-registers')
+        ->controller(CashRegisterController::class)
+        ->group(function () {
+            Route::get('/', 'index');
+            Route::get('/{id}', 'show')->whereNumber('id');
+            Route::post('/', 'store');
+            Route::put('/{id}', 'update')->whereNumber('id');
+            Route::patch('/{id}/status', 'updateStatus')->whereNumber('id');
+            Route::delete('/{id}', 'destroy')->whereNumber('id');
+        });
+
+    Route::prefix('cash-movement-reasons')
+        ->controller(CashMovementReasonController::class)
+        ->group(function () {
+            Route::get('/', 'index');
+            Route::post('/', 'store');
+            Route::put('/{id}', 'update')->whereNumber('id');
+            Route::delete('/{id}', 'destroy')->whereNumber('id');
+        });
+
+    Route::prefix('cash-sessions')
+        ->controller(CashSessionController::class)
+        ->group(function () {
+            Route::get('/', 'index');
+            Route::get('/current', 'current');
+            Route::get('/monitor', 'monitor');
+            Route::post('/open', 'open');
+            Route::get('/{id}', 'show')->whereNumber('id');
+            Route::get('/{id}/summary', 'summary')->whereNumber('id');
+            Route::post('/{id}/close', 'close')->whereNumber('id');
+            Route::post('/{id}/count', 'count')->whereNumber('id');
+        });
+
+    Route::prefix('cash-movements')
+        ->controller(CashMovementController::class)
+        ->group(function () {
+            Route::get('/', 'index');
+            Route::post('/', 'store');
+            Route::post('/{id}/authorize', 'authorize')->whereNumber('id');
+            Route::post('/{id}/reject', 'reject')->whereNumber('id');
+            Route::post('/{id}/cancel', 'cancel')->whereNumber('id');
+        });
 });

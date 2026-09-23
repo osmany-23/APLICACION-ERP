@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
             SecuritySeeder::class,
             AccountingAccountsSeeder::class,
             EmployeeDemoSeeder::class,
+            CashRegisterSeeder::class,
         ]);
     }
 }

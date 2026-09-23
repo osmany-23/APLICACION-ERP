@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\ImageLibraryService;
 use App\Traits\StatusUpdateable;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -12,8 +13,17 @@ use Illuminate\Validation\Rule;
 class ProductCatalogController extends Controller
 {
     use StatusUpdateable;
-    
+
     private const CATALOGS = ['brands', 'categories', 'subcategories', 'units'];
+
+    // 'subcategories' reutiliza la tabla "categories" (parent_id), asi que
+    // comparte el mismo "imageable_type" que 'categories' en la libreria de
+    // imagenes.
+    private const IMAGE_TYPES = [
+        'brands' => 'brand',
+        'categories' => 'category',
+        'subcategories' => 'category',
+    ];
 
     public function index(Request $request, string $catalog): JsonResponse
     {
@@ -79,12 +89,29 @@ class ProductCatalogController extends Controller
             return response()->json(['message' => $blockedMessage], 409);
         }
 
+        $imageType = self::IMAGE_TYPES[$catalog] ?? null;
+
         try {
-            match ($catalog) {
-                'brands' => DB::table('brands')->where('id', $id)->where('company_id', $companyId)->delete(),
-                'categories', 'subcategories' => DB::table('categories')->where('id', $id)->where('company_id', $companyId)->delete(),
-                'units' => DB::table('units')->where('id', $id)->where('company_id', $companyId)->delete(),
-            };
+            DB::transaction(function () use ($catalog, $id, $companyId, $imageType) {
+                // Igual que en productos: "images" es una tabla generica sin
+                // FK hacia brands/categories, se limpia a mano para no dejar
+                // BLOBs huerfanos. Si el delete de abajo falla por FK
+                // (registros relacionados), la transaccion revierte esto
+                // tambien.
+                if ($imageType) {
+                    DB::table('images')
+                        ->where('imageable_type', $imageType)
+                        ->where('imageable_id', $id)
+                        ->where('company_id', $companyId)
+                        ->delete();
+                }
+
+                match ($catalog) {
+                    'brands' => DB::table('brands')->where('id', $id)->where('company_id', $companyId)->delete(),
+                    'categories', 'subcategories' => DB::table('categories')->where('id', $id)->where('company_id', $companyId)->delete(),
+                    'units' => DB::table('units')->where('id', $id)->where('company_id', $companyId)->delete(),
+                };
+            });
         } catch (QueryException) {
             return response()->json([
                 'message' => 'No se puede eliminar porque tiene registros relacionados.',
@@ -132,11 +159,67 @@ class ProductCatalogController extends Controller
         ], 200);
     }
 
+    public function uploadImage(Request $request, string $catalog, int $id): JsonResponse
+    {
+        $this->ensureCatalog($catalog);
+        $imageType = self::IMAGE_TYPES[$catalog] ?? null;
+        abort_unless($imageType, 404, 'Este catalogo no admite imagenes.');
+
+        $companyId = (int) $request->user()->company_id;
+        $this->ensureItemExists($companyId, $catalog, $id);
+
+        $request->validate([
+            'image' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+        ], [
+            'image.required' => 'Selecciona una imagen.',
+            'image.mimes' => 'La imagen debe ser JPG, JPEG, PNG o WEBP.',
+            'image.max' => 'La imagen no puede superar los 10 MB.',
+        ]);
+
+        $userId = $request->user()->id ? (int) $request->user()->id : null;
+        $this->imageLibrary()->storeSingle($request->file('image'), $imageType, $id, $companyId, $userId);
+
+        return response()->json([
+            'message' => 'Imagen actualizada correctamente.',
+            'item' => $this->findItem($companyId, $catalog, $id),
+        ], 201);
+    }
+
+    public function deleteImage(Request $request, string $catalog, int $id): JsonResponse
+    {
+        $this->ensureCatalog($catalog);
+        $imageType = self::IMAGE_TYPES[$catalog] ?? null;
+        abort_unless($imageType, 404, 'Este catalogo no admite imagenes.');
+
+        $companyId = (int) $request->user()->company_id;
+        $this->ensureItemExists($companyId, $catalog, $id);
+
+        $image = DB::table('images')
+            ->where('imageable_type', $imageType)
+            ->where('imageable_id', $id)
+            ->where('company_id', $companyId)
+            ->first(['id']);
+
+        if ($image) {
+            $this->imageLibrary()->delete($imageType, $id, (int) $image->id, $companyId);
+        }
+
+        return response()->json([
+            'message' => 'Imagen eliminada correctamente.',
+            'item' => $this->findItem($companyId, $catalog, $id),
+        ]);
+    }
+
+    private function imageLibrary(): ImageLibraryService
+    {
+        return app(ImageLibraryService::class);
+    }
+
     private function brands(int $companyId)
     {
-        return DB::table('brands')
+        $rows = DB::table('brands')
             ->where('brands.company_id', $companyId)
-            ->select(['brands.id', 'brands.name', 'brands.description', 'brands.image_url', 'brands.is_active'])
+            ->select(['brands.id', 'brands.name', 'brands.description', 'brands.is_active'])
             ->selectSub(function ($query) use ($companyId) {
                 $query->from('products')
                     ->selectRaw('COUNT(*)')
@@ -144,12 +227,16 @@ class ProductCatalogController extends Controller
                     ->where('products.company_id', $companyId);
             }, 'products_count')
             ->orderBy('brands.name')
-            ->get()
+            ->get();
+
+        $imageUrls = $this->imageLibrary()->primaryUrlsFor('brand', $rows->pluck('id')->map(fn ($id) => (int) $id)->all());
+
+        return $rows
             ->map(fn ($brand) => [
                 'id' => (int) $brand->id,
                 'name' => (string) $brand->name,
                 'description' => (string) ($brand->description ?? ''),
-                'image_url' => (string) ($brand->image_url ?? ''),
+                'image_url' => (string) ($imageUrls[(int) $brand->id] ?? ''),
                 'is_active' => (bool) ($brand->is_active ?? true),
                 'products_count' => (int) $brand->products_count,
             ])
@@ -158,7 +245,7 @@ class ProductCatalogController extends Controller
 
     private function categories(int $companyId)
     {
-        return DB::table('categories')
+        $rows = DB::table('categories')
             ->where('categories.company_id', $companyId)
             ->whereNull('categories.parent_id')
             ->select([
@@ -166,7 +253,6 @@ class ProductCatalogController extends Controller
                 'categories.code',
                 'categories.name',
                 'categories.description',
-                'categories.image_url',
                 'categories.level',
                 'categories.margin_percent',
                 'categories.is_active',
@@ -184,13 +270,17 @@ class ProductCatalogController extends Controller
                     ->where('products.company_id', $companyId);
             }, 'products_count')
             ->orderBy('categories.name')
-            ->get()
+            ->get();
+
+        $imageUrls = $this->imageLibrary()->primaryUrlsFor('category', $rows->pluck('id')->map(fn ($id) => (int) $id)->all());
+
+        return $rows
             ->map(fn ($category) => [
                 'id' => (int) $category->id,
                 'code' => (string) ($category->code ?? ''),
                 'name' => (string) $category->name,
                 'description' => (string) ($category->description ?? ''),
-                'image_url' => (string) ($category->image_url ?? ''),
+                'image_url' => (string) ($imageUrls[(int) $category->id] ?? ''),
                 'level' => (int) ($category->level ?? 1),
                 'margin_percent' => (float) ($category->margin_percent ?? 0),
                 'is_active' => (bool) ($category->is_active ?? true),
@@ -202,7 +292,7 @@ class ProductCatalogController extends Controller
 
     private function subcategories(int $companyId)
     {
-        return DB::table('categories as subcategories')
+        $rows = DB::table('categories as subcategories')
             ->join('categories as parents', 'parents.id', '=', 'subcategories.parent_id')
             ->where('subcategories.company_id', $companyId)
             ->where('parents.company_id', $companyId)
@@ -212,7 +302,6 @@ class ProductCatalogController extends Controller
                 'subcategories.code',
                 'subcategories.name',
                 'subcategories.description',
-                'subcategories.image_url',
                 'subcategories.level',
                 'subcategories.parent_id',
                 'subcategories.margin_percent',
@@ -227,13 +316,20 @@ class ProductCatalogController extends Controller
             }, 'products_count')
             ->orderBy('parents.name')
             ->orderBy('subcategories.name')
-            ->get()
+            ->get();
+
+        // Las subcategorias comparten "imageable_type" con las categorias
+        // (misma tabla base "categories"), asi que se resuelven con el
+        // mismo tipo 'category'.
+        $imageUrls = $this->imageLibrary()->primaryUrlsFor('category', $rows->pluck('id')->map(fn ($id) => (int) $id)->all());
+
+        return $rows
             ->map(fn ($subcategory) => [
                 'id' => (int) $subcategory->id,
                 'code' => (string) ($subcategory->code ?? ''),
                 'name' => (string) $subcategory->name,
                 'description' => (string) ($subcategory->description ?? ''),
-                'image_url' => (string) ($subcategory->image_url ?? ''),
+                'image_url' => (string) ($imageUrls[(int) $subcategory->id] ?? ''),
                 'level' => (int) ($subcategory->level ?? 1),
                 'parent_id' => (int) $subcategory->parent_id,
                 'parent_name' => (string) $subcategory->parent_name,
@@ -291,7 +387,6 @@ class ProductCatalogController extends Controller
                 'code' => $this->generateBrandCode($companyId),
                 'name' => $this->cleanName($validated['name']),
                 'description' => $this->nullableText($validated['description'] ?? null),
-                'image_url' => $this->nullableText($validated['image_url'] ?? null),
                 'is_active' => (bool) ($validated['is_active'] ?? true),
             ]);
         });
@@ -307,7 +402,6 @@ class ProductCatalogController extends Controller
             ->update([
                 'name' => $this->cleanName($validated['name']),
                 'description' => $this->nullableText($validated['description'] ?? null),
-                'image_url' => $this->nullableText($validated['image_url'] ?? null),
                 'is_active' => (bool) ($validated['is_active'] ?? true),
             ]);
     }
@@ -322,7 +416,6 @@ class ProductCatalogController extends Controller
             'code' => $this->generateCategoryCode($companyId),
             'name' => $this->cleanName($validated['name']),
             'description' => $this->nullableText($validated['description'] ?? null),
-            'image_url' => $this->nullableText($validated['image_url'] ?? null),
             'level' => $this->resolveCategoryLevel($companyId, null, $validated['level'] ?? null),
             'margin_percent' => (float) ($validated['margin_percent'] ?? 0),
             'is_active' => (bool) ($validated['is_active'] ?? true),
@@ -342,7 +435,6 @@ class ProductCatalogController extends Controller
             ->update([
                 'name' => $this->cleanName($validated['name']),
                 'description' => $this->nullableText($validated['description'] ?? null),
-                'image_url' => $this->nullableText($validated['image_url'] ?? null),
                 'level' => $this->resolveCategoryLevel($companyId, null, $validated['level'] ?? null),
                 'margin_percent' => (float) ($validated['margin_percent'] ?? 0),
                 'is_active' => (bool) ($validated['is_active'] ?? true),
@@ -360,7 +452,6 @@ class ProductCatalogController extends Controller
             'code' => $this->generateCategoryCode($companyId),
             'name' => $this->cleanName($validated['name']),
             'description' => $this->nullableText($validated['description'] ?? null),
-            'image_url' => $this->nullableText($validated['image_url'] ?? null),
             'level' => $this->resolveCategoryLevel($companyId, (int) $validated['parent_id'], $validated['level'] ?? null),
             'margin_percent' => (float) ($validated['margin_percent'] ?? 0),
             'is_active' => (bool) ($validated['is_active'] ?? true),
@@ -381,7 +472,6 @@ class ProductCatalogController extends Controller
                 'parent_id' => (int) $validated['parent_id'],
                 'name' => $this->cleanName($validated['name']),
                 'description' => $this->nullableText($validated['description'] ?? null),
-                'image_url' => $this->nullableText($validated['image_url'] ?? null),
                 'level' => $this->resolveCategoryLevel($companyId, (int) $validated['parent_id'], $validated['level'] ?? null),
                 'margin_percent' => (float) ($validated['margin_percent'] ?? 0),
                 'is_active' => (bool) ($validated['is_active'] ?? true),
@@ -435,7 +525,6 @@ class ProductCatalogController extends Controller
                     ->ignore($id),
             ],
             'description' => ['nullable', 'string', 'max:500'],
-            'image_url' => ['nullable', 'string', 'max:255'],
             'is_active' => ['nullable', 'boolean'],
         ], $this->messages());
     }
@@ -552,7 +641,6 @@ class ProductCatalogController extends Controller
                     ->ignore($id),
             ],
             'description' => ['nullable', 'string', 'max:500'],
-            'image_url' => ['nullable', 'string', 'max:255'],
             'level' => ['nullable', 'integer', 'min:1', 'max:10'],
             'margin_percent' => ['nullable', 'numeric', 'min:0'],
             'is_active' => ['nullable', 'boolean'],
@@ -579,7 +667,6 @@ class ProductCatalogController extends Controller
                     ->ignore($id),
             ],
             'description' => ['nullable', 'string', 'max:500'],
-            'image_url' => ['nullable', 'string', 'max:255'],
             'level' => ['nullable', 'integer', 'min:1', 'max:10'],
             'margin_percent' => ['nullable', 'numeric', 'min:0'],
             'is_active' => ['nullable', 'boolean'],

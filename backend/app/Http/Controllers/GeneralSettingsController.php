@@ -11,6 +11,7 @@ use App\Models\Currency;
 use App\Models\ExchangeRate;
 use App\Models\Timezone;
 use App\Services\CompanySettingsService;
+use App\Services\ImageLibraryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -25,8 +26,19 @@ use Throwable;
 
 class GeneralSettingsController extends Controller
 {
-    public function __construct(private readonly CompanySettingsService $settings)
-    {
+    // Tipos usados en la libreria de imagenes para los 3 "logos" de
+    // empresa: cada uno es una entidad de una sola imagen independiente
+    // (subir el logo del menu nunca pisa el logo de login ni el favicon).
+    private const COMPANY_LOGO_TYPES = [
+        'logo_file' => 'company_logo',
+        'logo_dark_file' => 'company_logo_dark',
+        'favicon_file' => 'company_favicon',
+    ];
+
+    public function __construct(
+        private readonly CompanySettingsService $settings,
+        private readonly ImageLibraryService $imageLibrary,
+    ) {
     }
 
     public function publicBranding(): JsonResponse
@@ -45,6 +57,7 @@ class GeneralSettingsController extends Controller
                     'logo_dark_url' => null,
                     'favicon_url' => null,
                     'notifications_enabled' => true,
+                    'logo_height' => 64,
                 ],
             ]);
         }
@@ -92,6 +105,10 @@ class GeneralSettingsController extends Controller
 
             if ($settingGroups !== []) {
                 $this->settings->setMany($companyId, $settingGroups);
+            }
+
+            if (isset($validated['sales']) && (array_key_exists('iva_enabled', $validated['sales']) || array_key_exists('iva_rate', $validated['sales']))) {
+                $this->syncGeneralIvaTax($companyId);
             }
 
             $this->writeAudit($request, 'UPDATE', $companyId, null, $validated);
@@ -527,20 +544,18 @@ class GeneralSettingsController extends Controller
             }
         }
 
-        // Cada logo se guarda de forma independiente: subir el logo del menu
-        // (columna `logo`) nunca debe pisar el logo de login (`logo_dark`), y
-        // viceversa. Si el usuario no ha definido un logo de login propio, la
-        // UI/branding pública ya resuelve el fallback en tiempo de lectura
-        // (ver brandingPayload()), no hace falta duplicar el archivo aquí.
-        foreach ([
-            'logo_file' => 'logo',
-            'logo_dark_file' => 'logo_dark',
-            'favicon_file' => 'favicon',
-        ] as $fileField => $column) {
+        // Cada logo se guarda de forma independiente como BLOB en la tabla
+        // "images" (nunca como archivo en disco): subir el logo del menu
+        // nunca debe pisar el logo de login, y viceversa. Si el usuario no
+        // ha definido un logo de login propio, la UI/branding pública ya
+        // resuelve el fallback en tiempo de lectura (ver brandingPayload()).
+        $userId = $request->user()->id ? (int) $request->user()->id : null;
+
+        foreach (self::COMPANY_LOGO_TYPES as $fileField => $imageType) {
             $file = $this->requestFile($request, $fileField);
 
             if ($file) {
-                $data[$column] = $this->storeCompanyImage($file, $companyId, $column);
+                $this->imageLibrary->storeSingle($file, $imageType, $companyId, $companyId, $userId);
             }
         }
 
@@ -618,6 +633,52 @@ class GeneralSettingsController extends Controller
         ]);
     }
 
+    /**
+     * Sincroniza el toggle "IVA activado" + "% general" de Parametros
+     * Generales (sales.iva_enabled/sales.iva_rate) con la fila que
+     * SalesService::resolveLineTax() ya usa como impuesto por defecto
+     * (taxes.is_default = true) — asi el usuario configura el IVA desde
+     * una sola pantalla, sin tener que editar el catalogo de impuestos a
+     * mano, y sin que la venta necesite ningun cambio: sigue leyendo la
+     * misma fila de siempre. Si esta desactivado, la fila se marca
+     * is_active = false (deja de aplicarse a productos TAXABLE que no
+     * tengan un impuesto especifico asignado via product_taxes).
+     */
+    private function syncGeneralIvaTax(int $companyId): void
+    {
+        if (! Schema::hasTable('taxes')) {
+            return;
+        }
+
+        $enabled = (bool) $this->settings->get($companyId, 'sales', 'iva_enabled', true);
+        $rate = round((float) $this->settings->get($companyId, 'sales', 'iva_rate', 15.00), 4);
+
+        $tax = DB::table('taxes')->where('is_default', true)->first()
+            ?? DB::table('taxes')->where('code', 'IVA15')->first();
+
+        if ($tax) {
+            DB::table('taxes')->where('id', $tax->id)->update([
+                'rate' => $rate,
+                'is_default' => true,
+                'is_active' => $enabled,
+                'updated_at' => now(),
+            ]);
+
+            return;
+        }
+
+        DB::table('taxes')->insert([
+            'code' => 'IVA-GENERAL',
+            'name' => 'IVA General',
+            'rate' => $rate,
+            'type' => 'VAT',
+            'is_default' => true,
+            'is_active' => $enabled,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
     private function storeDollarExchangeRate(
         Request $request,
         int $companyId,
@@ -654,7 +715,7 @@ class GeneralSettingsController extends Controller
     {
         $groups = [];
 
-        foreach (['regional', 'mail', 'security', 'inventory', 'sales', 'purchases', 'printing', 'backup', 'system'] as $group) {
+        foreach (['regional', 'mail', 'security', 'inventory', 'sales', 'purchases', 'printing', 'branding', 'receipts', 'backup', 'system'] as $group) {
             if (isset($validated[$group]) && is_array($validated[$group])) {
                 $groups[$group] = $validated[$group];
             }
@@ -761,12 +822,9 @@ class GeneralSettingsController extends Controller
             'postal_code' => $company->postal_code,
             'latitude' => $company->latitude,
             'longitude' => $company->longitude,
-            'logo' => $company->logo,
-            'logo_url' => $this->storageUrl($company->logo),
-            'logo_dark' => $company->logo_dark,
-            'logo_dark_url' => $this->storageUrl($company->logo_dark),
-            'favicon' => $company->favicon,
-            'favicon_url' => $this->storageUrl($company->favicon),
+            'logo_url' => $this->imageLibrary->primaryUrlFor('company_logo', (int) $company->id),
+            'logo_dark_url' => $this->imageLibrary->primaryUrlFor('company_logo_dark', (int) $company->id),
+            'favicon_url' => $this->imageLibrary->primaryUrlFor('company_favicon', (int) $company->id),
             'currency_id' => $company->currency_id ? (int) $company->currency_id : null,
             'currency' => $company->currency ? $this->currencyPayload($company->currency) : null,
             'timezone' => $company->timezone,
@@ -786,10 +844,15 @@ class GeneralSettingsController extends Controller
             'commercial_name' => $company->name,
             'slogan' => $company->slogan,
             'welcome_text' => 'Bienvenido a '.$name,
-            'logo_url' => $this->storageUrl($company->logo),
-            'logo_dark_url' => $this->storageUrl($company->logo_dark ?: $company->logo),
-            'favicon_url' => $this->storageUrl($company->favicon),
+            'logo_url' => $this->imageLibrary->primaryUrlFor('company_logo', (int) $company->id),
+            'logo_dark_url' => $this->imageLibrary->primaryUrlFor('company_logo_dark', (int) $company->id)
+                ?? $this->imageLibrary->primaryUrlFor('company_logo', (int) $company->id),
+            'favicon_url' => $this->imageLibrary->primaryUrlFor('company_favicon', (int) $company->id),
             'notifications_enabled' => (bool) $this->settings->get((int) $company->id, 'system', 'notifications_enabled', true),
+            // Alto en pixeles para mostrar el logo (login y ticket de
+            // venta) — configurable en Configuracion > Empresa > Identidad
+            // visual, ver CompanySettingsService::defaults()['branding'].
+            'logo_height' => (int) $this->settings->get((int) $company->id, 'branding', 'logo_height', 64),
         ];
     }
 
@@ -867,30 +930,9 @@ class GeneralSettingsController extends Controller
         ];
     }
 
-    private function storeCompanyImage($file, int $companyId, string $name): string
-    {
-        $extension = $file->getClientOriginalExtension() ?: 'png';
-        $fileName = $name.'-'.now()->format('YmdHis').'.'.$extension;
-
-        return $file->storeAs('companies/'.$companyId, $fileName, 'public');
-    }
-
     private function requestFile(Request $request, string $field)
     {
         return $request->file("company.$field") ?: $request->file($field);
-    }
-
-    private function storageUrl(?string $path): ?string
-    {
-        if (! $path) {
-            return null;
-        }
-
-        if (Str::startsWith($path, ['http://', 'https://', '/'])) {
-            return $path;
-        }
-
-        return Storage::disk('public')->url($path);
     }
 
     private function applyTimezone(?string $timezone): void
